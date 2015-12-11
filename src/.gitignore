@@ -1,0 +1,7 @@
+.dirstamp
+.deps/
+.libs/
+*.la
+*.lo
+libdbuspolicy1.pc
+test-libdbuspolicy1
