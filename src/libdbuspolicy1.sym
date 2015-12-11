@@ -1,0 +1,19 @@
+LIBDBUSPOLICY1_1 {
+global:
+        dbuspolicy1_init;
+        dbuspolicy1_free;
+        dbuspolicy1_check_in;
+        dbuspolicy1_check_out;
+        dbuspolicy1_can_own;
+local:
+        *;
+};
+
+LIBDBUSPOLICY1_3 {
+global:
+        dbuspolicy1_thing_ref;
+        dbuspolicy1_thing_unref;
+        dbuspolicy1_thing_get_ctx;
+        dbuspolicy1_thing_new_from_string;
+        dbuspolicy1_thing_get_some_list_entry;
+} LIBDBUSPOLICY1_1;
