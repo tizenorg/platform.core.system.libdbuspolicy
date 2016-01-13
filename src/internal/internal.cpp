@@ -46,7 +46,7 @@ static const char* get_message_type(int type) {
 int __internal_init(unsigned int bus_type, const char* const config_name)
 {
     _ldp_xml_parser::XmlAsyncParser p;
-    auto err = p.parse_policy(get_bus(bus_type), get_str(config_name), std::chrono::milliseconds(100));
+    auto err = p.parse_policy(get_bus(bus_type), get_str(config_name));
     return err.get();
 }
 

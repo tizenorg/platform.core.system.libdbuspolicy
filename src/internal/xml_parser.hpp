@@ -40,7 +40,9 @@ namespace _ldp_xml_parser
             virtual ~XmlAsyncParser() {
             }
 
-            ErrCode parse_policy(const std::string bus, const std::string fname, const std::chrono::milliseconds timeout) {
+            ErrCode parse_policy(const std::string bus,
+                    const std::string fname,
+                    const std::chrono::milliseconds timeout = std::chrono::milliseconds(std::numeric_limits<int32_t>::max())) {
                 set_policy_bus_filename(bus, fname);
                 m_xml_policy.init();
                 ErrCode err = parse(timeout);

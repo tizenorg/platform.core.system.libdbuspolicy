@@ -20,22 +20,37 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <stdlib.h>
 
 namespace _ldp_tslog
 {
     typedef std::ostream& (*t_ManFun)(std::ostream&);
 
     namespace {
-        static constexpr bool LOG_ENABLE = false;
-        static constexpr bool LOG_VERBOSE = false;
+        static constexpr bool LOG_DEFAULT_ENABLE = false;
+        static constexpr bool LOG_DEFAULT_VERBOSE = false;
+        static const std::string LDP_ENV_VERBOSE_NAME = "LDP_VERBOSE";
+        static const std::string LDP_ENV_LOG_NAME = "LDP_LOG";
+
+        const bool get_log_env(const std::string& name) {
+            bool bret;
+            char* ldp_log_mode = getenv(name.c_str());
+            if(ldp_log_mode) {
+                const std::string slog(ldp_log_mode);
+                bret = (slog == "0") ? false : true;
+            } else {
+                bret = (name == LDP_ENV_LOG_NAME) ? LOG_DEFAULT_ENABLE : LOG_DEFAULT_VERBOSE;
+            }
+            return bret;
+        }
     }
 
     const bool get_verbose() {
-        return LOG_VERBOSE;
+        return get_log_env(LDP_ENV_VERBOSE_NAME);
     }
 
     const bool get_enable() {
-        return LOG_ENABLE;
+        return get_log_env(LDP_ENV_LOG_NAME);
     }
 
     class TsLog
