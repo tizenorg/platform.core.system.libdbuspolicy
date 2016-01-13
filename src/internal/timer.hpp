@@ -16,6 +16,7 @@
 
 #ifndef _TIMER_HPP
 #define _TIMER_HPP
+#include <chrono>
 
 namespace _ldp_timer
 {
