@@ -3,7 +3,7 @@ Summary:        Helper library for fine-grained userspace policy handling
 License:        Apache-2.0
 Group:          Base/IPC
 Version:        1.0.0
-Release:        0
+Release:        1
 
 Source: %{name}-%{version}.tar.gz
 BuildRequires:  boost-devel
