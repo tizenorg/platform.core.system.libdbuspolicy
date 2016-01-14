@@ -290,6 +290,10 @@ namespace _ldp_xml_parser
                             key.m_bown = true;
                             key.m_path_content[Key::IDX_SERVICE] = data_str;
                         }
+                        if(v.first == "own_prefix") {
+                            key.m_bown = true;
+                            key.m_path_content[Key::IDX_SERVICE] = data_str + "*";
+                        }
                         if(field_has(v, "_destination")) {
                             key.m_path_content[Key::IDX_DEST] = data_str;
                         }
@@ -427,6 +431,28 @@ namespace _ldp_xml_parser
             }
         }
 
+        ErrCode service_leaf_found(const Leaf& leaf, const std::string& label, const std::vector<std::string>& idx_v) {
+            ErrCode err;
+            if(leaf.get_check()) {
+                verbose::tout << __func__
+                    << ": cynara check needed for privilege " << leaf.get_privilege()
+                    << ", weight " << leaf.get_weight()
+                    << std::endl;
+
+                //cynara check
+                try {
+                    bool br = _ldp_cynara::Cynara::check(label, leaf.get_privilege(), idx_v[Key::IDX_USER]);
+                    err = ErrCode::ok(br);
+                } catch(const std::runtime_error& ex) {
+                    err = ErrCode::error(ex.what());
+                }
+            } else {
+                err = ErrCode::ok(leaf.get_decision());
+            }
+
+            return err;
+        }
+
         ErrCode index_decision_tree(const boost::property_tree::ptree& pt,
             const std::vector<std::string>& idx_v,
             const std::string& label,
@@ -465,23 +491,7 @@ namespace _ldp_xml_parser
                 }
 
                 if(found) {
-                    if(leaf_found.get_check()) {
-                        verbose::tout << __func__
-                            << ": cynara check needed for privilege " << leaf_found.get_privilege()
-                            << ", weight " << leaf_found.get_weight()
-                            << std::endl;
-
-                        //cynara check
-                        try {
-                            bool br = _ldp_cynara::Cynara::check(label, leaf_found.get_privilege(), idx_v[Key::IDX_USER]);
-                            err = ErrCode::ok(br);
-                        } catch(const std::runtime_error& ex) {
-                            err = ErrCode::error(ex.what());
-                        }
-                    } else {
-                        err = ErrCode::ok(leaf_found.get_decision());
-                    }
-
+                    err = service_leaf_found(leaf_found, label, idx_v);
                     verbose::tout << __func__ << ": returning decision #" << err.get() << " " << err.get_str() << ", weight " << leaf_found.get_weight() << std::endl;
                     break;
                 }
@@ -571,7 +581,29 @@ namespace _ldp_xml_parser
         }
 
         ErrCode can_own_what(const std::string bus, const std::vector<std::string>& idx_v) {
-            return can_do_action(bus, "OWN", idx_v);
+            ErrCode err;
+
+            //Evaluate own_prefix
+            std::vector<std::string> iv = idx_v;
+            const std::string srv = iv[iv.size() - 1];
+            const size_t srv_size = srv.size();
+            for(size_t n = 1; n <= srv_size; ++n) {
+                const std::string sub = srv.substr(0, n) + "*";
+                verbose::tout << "own_prefix: " << sub << std::endl;
+                iv.pop_back();
+                iv.push_back(sub);
+                err = can_do_action(bus, "OWN", iv);
+                if(err.is_ok()) {
+                    break;
+                }
+            }
+
+            //Evaluate own
+            if(err.is_error()) {
+                err = can_do_action(bus, "OWN", idx_v);
+            }
+
+            return err;
         }
 
         void print_decision_trees() {
