@@ -400,6 +400,7 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
                 break;
         }
     free(name);
+    name = NULL;
 
     if(message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
         rr = 0;
