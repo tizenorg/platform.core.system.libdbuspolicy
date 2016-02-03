@@ -336,7 +336,7 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
     if (message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
         rr = 0;
 
-        if (!sender)
+        if (!sender || !(*sender))
             rr = __internal_can_recv(p_udesc->bus_type, uid, gid, p_creds->label, sender, path, interface, member, message_type);
         else
             FOREACH_STRV(i, l, sender, name) {
@@ -388,7 +388,7 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
     snprintf(uid, 24, "%lu", (unsigned long int)sender_uid);
     snprintf(gid, 24, "%lu", (unsigned long int)sender_gid);
 
-    if (!destination)
+    if (!destination || !(*destination))
          rs = __internal_can_send(p_udesc->bus_type, uid, gid, sender_label, destination, path, interface, member, message_type);
     else
         FOREACH_STRV(i, l, destination, name) {
@@ -405,7 +405,7 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
     if(message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
         rr = 0;
 
-        if (!sender)
+        if (!sender || !(*sender))
             rr = __internal_can_recv(p_udesc->bus_type, p_udesc->user, p_udesc->group, p_udesc->label, sender, path, interface, member, message_type);
         else
             FOREACH_STRV(i, l, sender, name) {
