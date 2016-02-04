@@ -384,7 +384,8 @@ namespace _ldp_xml_parser
 
         void prepare_indexing_path(const std::vector<std::string>& idx_v,
                 const size_t pattern,
-                const size_t obfuscate_order,
+                const size_t usrgrp_obfuscate_order,
+                const bool obfuscate_params,
                 const CtxType& ctx_type,
                 std::string& path) {
 
@@ -392,7 +393,7 @@ namespace _ldp_xml_parser
             path = "R";
 
             if(ctx_type == CtxType::SPECIFIC) {
-                switch(obfuscate_order) {
+                switch(usrgrp_obfuscate_order) {
                     case 0:
                         path += (std::string(1, Key::DELIM) + get_field_str(idx_v[Key::IDX_USER]));
                         path += (std::string(1, Key::DELIM) + Key::ANY);
@@ -423,7 +424,7 @@ namespace _ldp_xml_parser
             for(size_t i = 0; i < n; ++i) {
                 std::string s = get_field_str(idx_v[i + offset]);
                 path += Key::DELIM;
-                if(pattern & (m << i)) {
+                if(obfuscate_params && (pattern & (m << i))) {
                     path += Key::ANY;
                 } else {
                     path += s;
@@ -456,19 +457,20 @@ namespace _ldp_xml_parser
         ErrCode index_decision_tree(const boost::property_tree::ptree& pt,
             const std::vector<std::string>& idx_v,
             const std::string& label,
+            const bool obfuscate_params,
             const CtxType& ctx_type) {
             ErrCode err;
             bool found = false;
             size_t weight = 0;
             const size_t offset = Key::IDX_DEFAULT;
             const size_t m = (ctx_type == CtxType::SPECIFIC) ? (1 << offset) : 1;
-            for(size_t ob_or = 0; ob_or < m; ++ob_or) {
+            for(size_t usrgrp_ob_or = 0; usrgrp_ob_or < m; ++usrgrp_ob_or) {
                 Leaf leaf_found;
                 const size_t n = 1 << (idx_v.size() - offset);
                 for(size_t p = 0; p < n; ++p) {
                     std::string path;
                     try {
-                        prepare_indexing_path(idx_v, p, ob_or, ctx_type, path);
+                        prepare_indexing_path(idx_v, p, usrgrp_ob_or, obfuscate_params, ctx_type, path);
                         boost::property_tree::ptree::path_type tpath(path, Key::DELIM);
 
                         auto dec = pt.get<Leaf>(tpath);
@@ -503,6 +505,7 @@ namespace _ldp_xml_parser
         ErrCode index_decision_tree_lat(const boost::property_tree::ptree& pt,
             const std::vector<std::string>& idx_v,
             const std::string& label,
+            const bool obfuscate_params,
             const CtxType& ctx_type) {
             ErrCode err;
 
@@ -514,7 +517,7 @@ namespace _ldp_xml_parser
             _ldp_timer::microsec latency;
             {
                 _ldp_timer::Timer<_ldp_timer::microsec> t(&latency);
-                err = index_decision_tree(pt, idx_v, label, ctx_type);
+                err = index_decision_tree(pt, idx_v, label, obfuscate_params, ctx_type);
             }
 
             tout << __func__ << ": #" << err.get() << " " << err.get_str() << " " << get_context_str(ctx_type) << std::endl;
@@ -522,16 +525,20 @@ namespace _ldp_xml_parser
             return err;
         }
 
-        ErrCode can_do_action(const std::string& bus, const std::string& tree_type, const std::vector<std::string>& idx_v, const std::string& label = "") {
+        ErrCode can_do_action(const std::string& bus,
+                const std::string& tree_type,
+                const std::vector<std::string>& idx_v,
+                const std::string& label = "",
+                const bool analyze_prefix = false) {
             std::unique_lock<std::mutex> lck(m_xml_policy_mtx);
             ErrCode err;
             boost::property_tree::ptree* const p_tree = get_decision_tree(bus, tree_type);
             if(p_tree) {
-                err = index_decision_tree_lat(*p_tree, idx_v, label, CtxType::MANDATORY);
+                err = index_decision_tree_lat(*p_tree, idx_v, label, !analyze_prefix, CtxType::MANDATORY);
                 if(!err.is_ok()) {
-                    err = index_decision_tree_lat(*p_tree, idx_v, label, CtxType::SPECIFIC);
+                    err = index_decision_tree_lat(*p_tree, idx_v, label, !analyze_prefix, CtxType::SPECIFIC);
                     if(!err.is_ok()) {
-                        err = index_decision_tree_lat(*p_tree, idx_v, label, CtxType::DEFAULT);
+                        err = index_decision_tree_lat(*p_tree, idx_v, label, !analyze_prefix, CtxType::DEFAULT);
                     }
                 }
             } else {
@@ -592,7 +599,7 @@ namespace _ldp_xml_parser
                 verbose::tout << "own_prefix: " << sub << std::endl;
                 iv.pop_back();
                 iv.push_back(sub);
-                err = can_do_action(bus, "OWN", iv);
+                err = can_do_action(bus, "OWN", iv, "", true);
                 if(err.is_ok()) {
                     break;
                 }
