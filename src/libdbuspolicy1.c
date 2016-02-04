@@ -121,13 +121,19 @@ static int kdbus_hello(struct kconn *kc, uint64_t hello_flags, uint64_t attach_f
     return 0;
 }
 
+static int kdbus_is_unique_id(const char* name)
+{
+    return (strlen(name)>3 && name[0]==':' && isdigit(name[1]) && name[2]=='.');
+}
+
 static int kdbus_get_creds_from_name(struct kconn* kc, struct kcreds* kcr, const char* name)
 {
+    unsigned long long int unique_id;
     struct kdbus_cmd_info* cmd;
     struct kdbus_info* conn_info;
     struct kdbus_item *item;
     char** tmp_names;
-    int j,size,r,l,counter;
+    int j, size, r, l, counter, type;
 
     counter = 0;
     kcr->names = calloc(counter+1, sizeof(char *));
@@ -136,17 +142,26 @@ static int kdbus_get_creds_from_name(struct kconn* kc, struct kcreds* kcr, const
     kcr->gid = GID_INVALID;
     kcr->label = NULL;
 
-
-    l = strlen(name) + 1;
-
-    size = offsetof(struct kdbus_cmd_info, items) + ALIGN8((l) + offsetof(struct kdbus_item, data));//ietms+aligned(l+ITEM_HEADER_SIZE)
-    cmd = aligned_alloc(8, size);
-    memset(cmd, 0, sizeof(struct kdbus_cmd_info));
-    cmd->items[0].size =  l + offsetof(struct kdbus_item, data) ;
-    cmd->items[0].type = KDBUS_ITEM_NAME;
-    memcpy(cmd->items[0].str, name, l);
-    cmd->size = size;
-    cmd->attach_flags  = KDBUS_ATTACH_CREDS | KDBUS_ATTACH_SECLABEL | KDBUS_ATTACH_NAMES ;
+    if (kdbus_is_unique_id(name)) {
+        l = sizeof(unique_id);
+        unique_id = strtoull(name+3, NULL, 10);
+        size = sizeof(struct kdbus_cmd_info);
+        cmd = aligned_alloc(8, size);
+        memset(cmd, 0, sizeof(struct kdbus_cmd_info));
+        cmd->id = unique_id;
+        cmd->size = size;
+        cmd->attach_flags  = KDBUS_ATTACH_CREDS | KDBUS_ATTACH_SECLABEL | KDBUS_ATTACH_NAMES;
+    } else {
+        l = strlen(name) + 1;
+        size = offsetof(struct kdbus_cmd_info, items) + ALIGN8((l) + offsetof(struct kdbus_item, data));
+        cmd = aligned_alloc(8, size);
+        memset(cmd, 0, sizeof(struct kdbus_cmd_info));
+        cmd->items[0].size =  l + offsetof(struct kdbus_item, data);
+        cmd->items[0].type = KDBUS_ITEM_NAME;
+        memcpy(cmd->items[0].str, name, l);
+        cmd->size = size;
+        cmd->attach_flags  = KDBUS_ATTACH_CREDS | KDBUS_ATTACH_SECLABEL | KDBUS_ATTACH_NAMES;
+    }
 
     r = ioctl(kc->fd, KDBUS_CMD_CONN_INFO, cmd);
     if (r < 0)
