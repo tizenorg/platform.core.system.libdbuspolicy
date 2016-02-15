@@ -73,12 +73,6 @@ my_CXXFLAGS="\
 "
 
 AC_SUBST([my_CXXFLAGS])
-PKG_CHECK_MODULES([CYNARA], [cynara-client >= 0.4.2 cynara-session >= 0.4.2],
-     [AC_DEFINE([ENABLE_CYNARA], [1], [Define to enable Cynara privilege checks in libdbuspolicy])],
-     [AC_MSG_ERROR([libcynara-client-async and cynara-session are required to enable Cynara integration])])
-
-AC_SUBST([CYNARA_CFLAGS])
-AC_SUBST([CYNARA_LIBS])
 
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_FILES([

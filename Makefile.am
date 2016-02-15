@@ -43,10 +43,7 @@ LIBDBUSPOLICY1_AGE=0
 pkginclude_HEADERS = src/dbuspolicy1/libdbuspolicy1.h
 lib_LTLIBRARIES = src/libdbuspolicy1.la
 
-src_libdbuspolicy1_la_SOURCES =\
-	src/libdbuspolicy1-private.h \
-	src/libdbuspolicy1.c \
-    src/internal/internal.cpp
+src_libdbuspolicy1_la_SOURCES = src/libdbuspolicy1.c
 
 EXTRA_DIST += src/libdbuspolicy1.sym
 
@@ -60,9 +57,3 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = src/libdbuspolicy1.pc
 EXTRA_DIST += src/libdbuspolicy1.pc.in
 CLEANFILES += src/libdbuspolicy1.pc
-
-TESTS = src/test-libdbuspolicy1
-
-check_PROGRAMS = src/test-libdbuspolicy1
-src_test_libdbuspolicy1_SOURCES = src/test-libdbuspolicy1.c
-src_test_libdbuspolicy1_LDADD = src/libdbuspolicy1.la $(CYNARA_LIBS)

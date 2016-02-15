@@ -1,17 +1,17 @@
-Name:           libdbuspolicy
+Name:           libdbuspolicy-dummy
 Summary:        Helper library for fine-grained userspace policy handling
 License:        Apache-2.0
 Group:          Base/IPC
 Version:        1.0.0
 Release:        0
 Source:         %{name}-%{version}.tar.gz
-Source1001:     %{name}.manifest
-BuildRequires:  boost-devel
-BuildRequires:  pkgconfig(cynara-client)
+Source1001:     libdbuspolicy.manifest
 
 %description
 libdbuspolicy is a helper library for fine-grained userspace
 policy handling (with SMACK support)
+.
+This version provides dummy version of library.
 
 %prep
 %setup -q
@@ -32,7 +32,7 @@ make DESTDIR=%{buildroot} install-strip
 %postun -p /sbin/ldconfig
 
 %files
-%manifest %{name}.manifest
+%manifest libdbuspolicy.manifest
 %defattr(-,root,root)
 %{_includedir}/*
 

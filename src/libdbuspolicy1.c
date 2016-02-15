@@ -17,292 +17,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
-#include <stdarg.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
-#include <string.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <stdint.h>
-#include <sys/mman.h>
-#include <pwd.h>
-#include <grp.h>
 
 #include <dbuspolicy1/libdbuspolicy1.h>
-#include "libdbuspolicy1-private.h"
-#include "internal/internal.h"
 
-#define KDBUS_SYSTEM_BUS_PATH "/sys/fs/kdbus/0-system/bus"
-#define KDBUS_POOL_SIZE (16 * 1024UL * 1024UL)
+#define DBUSPOLICY1_EXPORT __attribute__ ((visibility("default")))
 
-#define ALIGN8(l) (((l) + 7) & ~7)
-#define UID_INVALID ((uid_t) -1)
-#define GID_INVALID ((gid_t) -1)
-
-#define FOREACH_STRV(i,l, s, os)\
-for(\
-({\
-i=0;\
-l = strlen(s);\
-name = malloc(sizeof(char*)*(l+1));\
-strcpy(os, s);\
-});\
-i < l;\
-i++)
-
-#define GET_NEXT_STR(i,s,os)\
-        os = s+i;\
-        for(;s[i] && s[i] != ' ';i++);\
-        s[i] = 0;
-
-
-
-/** A process ID */
-typedef unsigned long dbus_pid_t;
-/** A user ID */
-typedef unsigned long dbus_uid_t;
-/** A group ID */
-typedef unsigned long dbus_gid_t;
-
-struct kcreds {
-    uid_t uid;
-    gid_t gid;
-    char* label;
-    char** names;
-};
-
-struct kconn {
-    int fd;
-    uint64_t id;
-    char *pool;
-};
-struct udesc {
-    unsigned int bus_type;
-    char user[256];
-    dbus_uid_t uid;
-    char group[256];
-    dbus_gid_t gid;
-    char label[256];
-    struct kconn* conn;
-};
-
-static void print_udesc(const char* const entry, const struct udesc* const p_udesc) {
-}
-
-static int kdbus_open_system_bus(void)
-{
-    return  open(KDBUS_SYSTEM_BUS_PATH, O_RDWR|O_NOCTTY|O_LARGEFILE|O_CLOEXEC );
-}
-
-static int kdbus_hello(struct kconn *kc, uint64_t hello_flags, uint64_t attach_flags_send, uint64_t attach_flags_recv)
-{
-    struct kdbus_cmd_hello kcmd_hello;
-    int r;
-
-    memset(&kcmd_hello, 0, sizeof(kcmd_hello));
-    kcmd_hello.flags = hello_flags;
-    kcmd_hello.attach_flags_send = attach_flags_send;
-    kcmd_hello.attach_flags_recv = attach_flags_recv;
-    kcmd_hello.size = sizeof(kcmd_hello);
-    kcmd_hello.pool_size = KDBUS_POOL_SIZE;
-
-    r = ioctl(kc->fd, KDBUS_CMD_HELLO, &kcmd_hello);
-    if (r < 0)
-        return -errno;
-
-    kc->id = (uint64_t)kcmd_hello.id;
-    kc->pool = mmap(NULL, KDBUS_POOL_SIZE, PROT_READ, MAP_SHARED, kc->fd, 0);
-    if (kc->pool == MAP_FAILED)
-        return -errno;
-
-    return 0;
-}
-
-static int kdbus_is_unique_id(const char* name)
-{
-    return (strlen(name)>3 && name[0]==':' && isdigit(name[1]) && name[2]=='.');
-}
-
-static int kdbus_get_creds_from_name(struct kconn* kc, struct kcreds* kcr, const char* name)
-{
-    unsigned long long int unique_id;
-    struct kdbus_cmd_info* cmd;
-    struct kdbus_info* conn_info;
-    struct kdbus_item *item;
-    char** tmp_names;
-    int j, size, r, l, counter, type;
-
-    counter = 0;
-    kcr->names = calloc(counter+1, sizeof(char *));
-
-    kcr->uid = UID_INVALID;
-    kcr->gid = GID_INVALID;
-    kcr->label = NULL;
-
-    if (kdbus_is_unique_id(name)) {
-        l = sizeof(unique_id);
-        unique_id = strtoull(name+3, NULL, 10);
-        size = sizeof(struct kdbus_cmd_info);
-        cmd = aligned_alloc(8, size);
-        memset(cmd, 0, sizeof(struct kdbus_cmd_info));
-        cmd->id = unique_id;
-        cmd->size = size;
-        cmd->attach_flags  = KDBUS_ATTACH_CREDS | KDBUS_ATTACH_SECLABEL | KDBUS_ATTACH_NAMES;
-    } else {
-        l = strlen(name) + 1;
-        size = offsetof(struct kdbus_cmd_info, items) + ALIGN8((l) + offsetof(struct kdbus_item, data));
-        cmd = aligned_alloc(8, size);
-        memset(cmd, 0, sizeof(struct kdbus_cmd_info));
-        cmd->items[0].size =  l + offsetof(struct kdbus_item, data);
-        cmd->items[0].type = KDBUS_ITEM_NAME;
-        memcpy(cmd->items[0].str, name, l);
-        cmd->size = size;
-        cmd->attach_flags  = KDBUS_ATTACH_CREDS | KDBUS_ATTACH_SECLABEL | KDBUS_ATTACH_NAMES;
-    }
-
-    r = ioctl(kc->fd, KDBUS_CMD_CONN_INFO, cmd);
-    if (r < 0)
-        return -errno;
-
-    conn_info = (struct kdbus_info *) ((uint8_t *) kc->pool + cmd->offset);
-
-    for(item = conn_info->items;
-        ((uint8_t *)(item) < (uint8_t *)(conn_info) + (conn_info)->size) &&
-        ((uint8_t *) item >= (uint8_t *) conn_info);
-        item = ((typeof(item))(((uint8_t *)item) + ALIGN8((item)->size))) )
-        {
-            switch (item->type)
-            {
-                case KDBUS_ITEM_CREDS:
-                    if (item->creds.euid != UID_INVALID)
-                    {
-                         kcr->uid = (uid_t) item->creds.euid;
-                    }
-                    if (item->creds.egid != GID_INVALID)
-                    {
-                        kcr->gid = (gid_t) item->creds.egid;
-                    }
-                break;
-            case KDBUS_ITEM_SECLABEL:
-                kcr->label = strdup(item->str);
-            break;
-            case KDBUS_ITEM_OWNED_NAME:
-                counter++;
-                tmp_names = calloc(counter+1, sizeof(char*));
-                for (j = 0;kcr->names[j]; j++)
-                {
-                    tmp_names[j] = kcr->names[j];
-                }
-                tmp_names[j] = strdup(item->name.name);
-                free(kcr->names);
-                kcr->names = tmp_names;
-            break;
-        }
-    }
-
-    return 0;
-}
-
-static void kcreds_free(struct kcreds* kcr)
-{
-    int i = 0;
-    if (kcr == NULL)
-        return;
-
-    free(kcr->label);
-    for (i=0; kcr->names[i];i++)
-        free(kcr->names[i]);
-    free(kcr->names[i]);
-    free(kcr->names);
-    free(kcr);
-}
-/**
- * dbuspolicy1_init
- * @config_name: name of the XML configuration file
- *
- * Set the configuration file used by the calling application
- **/
 DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
 {
-    struct kconn* kc;
-    uint64_t hello_flags = 0;
-    uint64_t attach_flags_send =  _KDBUS_ATTACH_ANY;
-    uint64_t attach_flags_recv =  _KDBUS_ATTACH_ALL;
-    int r,fdl;
-    struct udesc* p_udesc;
+    static const unsigned long opaque_blob = 0xfeeddead;
 
-    kc = (struct kconn*) calloc(1, sizeof(struct kconn));
-    if (!kc)
-        return NULL;
-
-    kc->fd = kdbus_open_system_bus();
-    r = kdbus_hello(kc, hello_flags, attach_flags_send, attach_flags_recv);
-    if (r < 0) {
-        free(kc);
-        return NULL;
-    }
-
-    r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE : SESSION_BUS_CONF_FILE);
-    if(r >= 0) {
-        p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
-        if(p_udesc) {
-            p_udesc->bus_type = bus_type;
-            p_udesc->uid = getuid();
-            p_udesc->gid = getgid();
-            struct passwd* pwd = getpwuid(p_udesc->uid);
-            strcpy(p_udesc->user, pwd->pw_name);
-            struct group* gg = getgrgid(p_udesc->gid);
-            strcpy(p_udesc->group, gg->gr_name);
-            p_udesc->conn = kc;
-
-            fdl = open("/proc/self/attr/current", 0, S_IRUSR);
-            if (fdl < 0)
-            {
-                fprintf(stderr,"Cannot open /proc/self/attr/current\n");
-                dbuspolicy1_free(p_udesc);
-                return NULL;
-            }
-
-            r = read(fdl, p_udesc->label, 256);
-            if (r < 0)
-            {
-                fprintf(stderr, "Cannot read from /proc/self/attr/current\n");
-                close(fdl);
-                dbuspolicy1_free(p_udesc);
-                return NULL;
-            }
-            close(fdl);
-
-
-            print_udesc("New configuration", p_udesc);
-        }
-    } else {
-        p_udesc = NULL;
-    }
-    return p_udesc;
+    return &opaque_blob;
 }
 
 DBUSPOLICY1_EXPORT void dbuspolicy1_free(void* configuration)
 {
-    struct udesc* p_udesc = (struct udesc*)configuration;
-    if(p_udesc) {
-        print_udesc("Freeing configuration", p_udesc);
-        free(p_udesc->conn);
-        free(p_udesc);
-        p_udesc = NULL;
-    }
+	(void)configuration;
 }
 
-/**
- * dbuspolicy1_can_send
- * @param: <>
- * @return: <>
- *
- * Description.
- **/
 DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
         const char        *destination,
         const char        *sender,
@@ -314,69 +48,9 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
         int               reply_serial,
         int               requested_reply)
 {
-    struct udesc* const p_udesc = (struct udesc*)configuration;
-    int i, rs, rr, l,  r = 0;
-    struct kcreds* p_creds = NULL;
-    char gid[25], uid[25];
-    char* name = NULL;
-    char  empty_names = 1;
-
-    rs = 0;
-    rr = 1;
-
-    if (message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL || (destination != NULL && *destination != '\0') ) {
-        p_creds = calloc(1, sizeof(struct kcreds));
-        r = kdbus_get_creds_from_name(p_udesc->conn, p_creds, destination);
-        if(r < 0) {
-            kcreds_free(p_creds);
-            return 0;
-        }
-
-        snprintf(uid, 24, "%lu", (unsigned long int)p_creds->uid);
-        snprintf(gid, 24, "%lu", (unsigned long int)p_creds->gid);
-        if (!p_creds->names[0])
-            empty_names = 0;
-
-        for (i=0;p_creds->names[i];i++)
-        {
-            rs = __internal_can_send(p_udesc->bus_type, p_udesc->user, p_udesc->group, p_udesc->label, p_creds->names[i], path, interface, member, message_type);
-            if (rs > 0)
-                break;
-        }
-    }
-
-    if (empty_names)
-        rs = __internal_can_send(p_udesc->bus_type, p_udesc->user, p_udesc->group, p_udesc->label, destination, path, interface, member, message_type);
-
-    if (message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
-        rr = 0;
-
-        if (!sender || !(*sender))
-            rr = __internal_can_recv(p_udesc->bus_type, uid, gid, p_creds->label, sender, path, interface, member, message_type);
-        else
-            FOREACH_STRV(i, l, sender, name) {
-                char* source;
-                GET_NEXT_STR(i, name, source);
-                rr = __internal_can_recv(p_udesc->bus_type, uid, gid, p_creds->label, source, path, interface, member, message_type);
-                if (rr > 0)
-                    break;
-            }
-    }
-
-    free(name);
-    kcreds_free(p_creds);
-
-    if(rs > 0 && rr > 0) { r = 1; }
-    if(rs < 0 || rr < 0) { r = -1; }
-    return r;
+    return 1;
 }
-/**
- * dbuspolicy1_can_send
- * @param: <>
- * @return: <>
- *
- * Description.
- **/
+
 DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
         const char        *destination,
         const char        *sender,
@@ -391,64 +65,10 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
         int               reply_serial,
         int               requested_reply)
 {
-    struct udesc* const p_udesc = (struct udesc*)configuration;
-    int i, rs, rr, l, r = 0;
-    struct kcreds* p_creds = NULL;
-    char gid[25], uid[25];
-    char* name = NULL;
-
-    rs = 0;
-    rr = 1;
-
-    snprintf(uid, 24, "%lu", (unsigned long int)sender_uid);
-    snprintf(gid, 24, "%lu", (unsigned long int)sender_gid);
-
-    if (!destination || !(*destination))
-         rs = __internal_can_send(p_udesc->bus_type, uid, gid, sender_label, destination, path, interface, member, message_type);
-    else
-        FOREACH_STRV(i, l, destination, name) {
-            char* dest;
-            GET_NEXT_STR(i, name, dest);
-
-            rs = __internal_can_send(p_udesc->bus_type, uid, gid, sender_label, dest, path, interface, member, message_type);
-            if (rs > 0)
-                break;
-        }
-    free(name);
-    name = NULL;
-
-    if(message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
-        rr = 0;
-
-        if (!sender || !(*sender))
-            rr = __internal_can_recv(p_udesc->bus_type, p_udesc->user, p_udesc->group, p_udesc->label, sender, path, interface, member, message_type);
-        else
-            FOREACH_STRV(i, l, sender, name) {
-                char* source;
-                GET_NEXT_STR(i, name, source);
-                rr = __internal_can_recv(p_udesc->bus_type, p_udesc->user, p_udesc->group, p_udesc->label, source, path, interface, member, message_type);
-                if(rr > 0)
-                    break;
-            }
-        free(name);
-    }
-    kcreds_free(p_creds);
-
-    if(rs > 0 && rr > 0) { r = 1; }
-    if(rs < 0 || rr < 0) { r = -1; }
-    return r;
+    return 1;
 }
 
-
-/**
- * dbuspolicy1_can_send
- * @param: <>
- * @return: <>
- *
- * Description.
- **/
 DBUSPOLICY1_EXPORT int dbuspolicy1_can_own(void* configuration, const char* const service)
 {
-    struct udesc* const p_udesc = (struct udesc*)configuration;
-    return  __internal_can_own(p_udesc->bus_type, p_udesc->user, p_udesc->group, service);
+    return 1;
 }
