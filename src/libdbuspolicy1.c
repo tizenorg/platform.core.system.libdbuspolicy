@@ -247,7 +247,11 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
         return NULL;
     }
 
-    r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE : SESSION_BUS_CONF_FILE);
+    r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_PRIMARY : SESSION_BUS_CONF_FILE_PRIMARY);
+    if(r < 0) {
+        printf("Failed to parse primary config file, trying secondary config...\n");
+        r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY);
+    }
     if(r >= 0) {
         p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
         if(p_udesc) {

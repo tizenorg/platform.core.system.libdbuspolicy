@@ -23,8 +23,11 @@
 extern "C" {
 #endif
 
-#define SYSTEM_BUS_CONF_FILE  "/etc/dbus-1/system.conf"
-#define SESSION_BUS_CONF_FILE "/etc/dbus-1/session.conf"
+#define SYSTEM_BUS_CONF_FILE_PRIMARY  "/usr/share/dbus-1/system.conf"
+#define SESSION_BUS_CONF_FILE_PRIMARY "/usr/share/dbus-1/session.conf"
+
+#define SYSTEM_BUS_CONF_FILE_SECONDARY  "/etc/dbus-1/system.conf"
+#define SESSION_BUS_CONF_FILE_SECONDARY "/etc/dbus-1/session.conf"
 
 #define SYSTEM_BUS   1
 #define SESSION_BUS  2
