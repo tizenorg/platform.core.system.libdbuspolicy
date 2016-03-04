@@ -7,7 +7,8 @@ Release:        0
 Source:         %{name}-%{version}.tar.gz
 Source1001:     %{name}.manifest
 BuildRequires:  boost-devel
-BuildRequires:  pkgconfig(cynara-client)
+BuildRequires:  cynara-devel
+Requires:       pkgconfig(cynara-client)
 
 %description
 libdbuspolicy is a helper library for fine-grained userspace
