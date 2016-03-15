@@ -133,7 +133,8 @@ static int kdbus_get_creds_from_name(struct kconn* kc, struct kcreds* kcr, const
     struct kdbus_info* conn_info;
     struct kdbus_item *item;
     char** tmp_names;
-    int j, size, r, l, counter, type;
+    int j, r, l, counter, type;
+    unsigned int size;
 
     counter = 0;
     kcr->names = calloc(counter+1, sizeof(char *));
@@ -241,6 +242,7 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
     kc->fd = kdbus_open_system_bus();
     r = kdbus_hello(kc, hello_flags, attach_flags_send, attach_flags_recv);
     if (r < 0) {
+	close(kc->fd);
         free(kc);
         return NULL;
     }
@@ -253,9 +255,9 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
             p_udesc->uid = getuid();
             p_udesc->gid = getgid();
             struct passwd* pwd = getpwuid(p_udesc->uid);
-            strcpy(p_udesc->user, pwd->pw_name);
+            strncpy(p_udesc->user, pwd->pw_name, sizeof(p_udesc->user)-1);
             struct group* gg = getgrgid(p_udesc->gid);
-            strcpy(p_udesc->group, gg->gr_name);
+            strncpy(p_udesc->group, gg->gr_name, sizeof(p_udesc->group)-1);
             p_udesc->conn = kc;
 
             fdl = open("/proc/self/attr/current", 0, S_IRUSR);
