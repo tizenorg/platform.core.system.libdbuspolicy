@@ -48,7 +48,7 @@ for(\
 i=0;\
 l = strlen(s);\
 name = malloc(sizeof(char*)*(l+1));\
-strcpy(os, s);\
+strncpy(os, s, sizeof(char*)*(l+1)-1);\
 });\
 i < l;\
 i++)
