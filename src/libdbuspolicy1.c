@@ -251,12 +251,27 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
     if(r >= 0) {
         p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
         if(p_udesc) {
+            struct passwd pwent;
+            struct passwd *pwd;
+            struct group grent;
+            struct group* gg;
+            char buf[1024];
+
             p_udesc->bus_type = bus_type;
             p_udesc->uid = getuid();
             p_udesc->gid = getgid();
-            struct passwd* pwd = getpwuid(p_udesc->uid);
+
+            if (getpwuid_r(p_udesc->uid, &pwent, buf, sizeof(buf), &pwd) ) {
+                p_udesc = NULL;
+                return p_udesc;
+            }
+
+            if (getgrgid_r(p_udesc->gid, &grent, buf, sizeof(buf), &gg) ) {
+                p_udesc = NULL;
+                return p_udesc;
+            }
+
             strncpy(p_udesc->user, pwd->pw_name, sizeof(p_udesc->user)-1);
-            struct group* gg = getgrgid(p_udesc->gid);
             strncpy(p_udesc->group, gg->gr_name, sizeof(p_udesc->group)-1);
             p_udesc->conn = kc;
 
