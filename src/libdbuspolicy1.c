@@ -263,11 +263,13 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
 
             if (getpwuid_r(p_udesc->uid, &pwent, buf, sizeof(buf), &pwd) ) {
                 p_udesc = NULL;
+                free(kc);
                 return p_udesc;
             }
 
             if (getgrgid_r(p_udesc->gid, &grent, buf, sizeof(buf), &gg) ) {
                 p_udesc = NULL;
+                free(kc);
                 return p_udesc;
             }
 
@@ -298,6 +300,7 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
         }
     } else {
         p_udesc = NULL;
+        free(kc);
     }
     return p_udesc;
 }
