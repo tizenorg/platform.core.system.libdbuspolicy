@@ -263,12 +263,14 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
 
             if (getpwuid_r(p_udesc->uid, &pwent, buf, sizeof(buf), &pwd) ) {
                 p_udesc = NULL;
+		close(kc->fd);
                 free(kc);
                 return p_udesc;
             }
 
             if (getgrgid_r(p_udesc->gid, &grent, buf, sizeof(buf), &gg) ) {
                 p_udesc = NULL;
+		close(kc->fd);
                 free(kc);
                 return p_udesc;
             }
@@ -300,6 +302,7 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
         }
     } else {
         p_udesc = NULL;
+	close(kc->fd);
         free(kc);
     }
     return p_udesc;
@@ -310,6 +313,7 @@ DBUSPOLICY1_EXPORT void dbuspolicy1_free(void* configuration)
     struct udesc* p_udesc = (struct udesc*)configuration;
     if(p_udesc) {
         print_udesc("Freeing configuration", p_udesc);
+	close(p_udesc->conn->fd);
         free(p_udesc->conn);
         free(p_udesc);
         p_udesc = NULL;
