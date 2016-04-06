@@ -218,6 +218,50 @@ static void kcreds_free(struct kcreds* kcr)
     free(kcr->names);
     free(kcr);
 }
+
+static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct udesc* p_udesc)
+{
+     struct passwd pwent;
+     struct passwd *pwd;
+     struct group grent;
+     struct group *gg;
+     char buf[1024];
+     int attr_fd;
+     int r;
+     int len;
+
+     attr_fd = open("/proc/self/attr/current", O_RDONLY);
+     if (attr_fd < 0)
+	  return -1;
+     r = read(attr_fd, p_udesc->label, 256);
+
+     close(attr_fd);
+
+     if (r < 0) /* read */
+	  return -1;
+
+     if (getpwuid_r(p_udesc->uid, &pwent, buf, sizeof(buf), &pwd))
+	  return -1;
+
+     if (getgrgid_r(p_udesc->gid, &grent, buf, sizeof(buf), &gg))
+	  return -1;
+
+     len = sizeof(p_udesc->user) - 1;
+     strncpy(p_udesc->user, pwd->pw_name, len);
+     p_udesc->group[len] = 0;
+
+     len = sizeof(p_udesc->group) - 1;
+     strncpy(p_udesc->group, gg->gr_name, len);
+     p_udesc->group[len] = 0;
+
+     p_udesc->bus_type = bus_type;
+     p_udesc->uid = getuid();
+     p_udesc->gid = getgid();
+     p_udesc->conn = kc;
+
+     return 0;
+}
+
 /**
  * dbuspolicy1_init
  * @config_name: name of the XML configuration file
@@ -226,84 +270,40 @@ static void kcreds_free(struct kcreds* kcr)
  **/
 DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
 {
-    struct kconn* kc;
-    uint64_t hello_flags = 0;
-    uint64_t attach_flags_send =  _KDBUS_ATTACH_ANY;
-    uint64_t attach_flags_recv =  _KDBUS_ATTACH_ALL;
-    int r,fdl;
-    struct udesc* p_udesc;
+     uint64_t hello_flags = 0;
+     uint64_t attach_flags_send =  _KDBUS_ATTACH_ANY;
+     uint64_t attach_flags_recv =  _KDBUS_ATTACH_ALL;
+     struct kconn* kc = NULL;
+     struct udesc* p_udesc = NULL;
 
-    kc = (struct kconn*) calloc(1, sizeof(struct kconn));
-    if (!kc)
-        return NULL;
+     kc = (struct kconn*) calloc(1, sizeof(struct kconn));
+     p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
+     if (!kc || !p_udesc)
+	  goto err;
 
-    kc->fd = kdbus_open_system_bus();
-    r = kdbus_hello(kc, hello_flags, attach_flags_send, attach_flags_recv);
-    if (r < 0) {
-	close(kc->fd);
-        free(kc);
-        return NULL;
-    }
+     if ((kc->fd = kdbus_open_system_bus()) < 0)
+	  goto err;
 
-    r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_PRIMARY : SESSION_BUS_CONF_FILE_PRIMARY);
-    if(r < 0) {
-        r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY);
-    }
-    if(r >= 0) {
-        p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
-        if(p_udesc) {
-            struct passwd pwent;
-            struct passwd *pwd;
-            struct group grent;
-            struct group* gg;
-            char buf[1024];
+     if (kdbus_hello(kc, hello_flags, attach_flags_send, attach_flags_recv) < 0)
+	  goto err;
 
-            p_udesc->bus_type = bus_type;
-            p_udesc->uid = getuid();
-            p_udesc->gid = getgid();
+     if (__internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_PRIMARY : SESSION_BUS_CONF_FILE_PRIMARY) < 0
+	 && __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY) < 0)
+	  goto err;
 
-            if (getpwuid_r(p_udesc->uid, &pwent, buf, sizeof(buf), &pwd) ) {
-                p_udesc = NULL;
-		close(kc->fd);
-                free(kc);
-                return p_udesc;
-            }
+     if (dbuspolicy_init_udesc(kc, bus_type, p_udesc) < 0)
+	  goto err;
 
-            if (getgrgid_r(p_udesc->gid, &grent, buf, sizeof(buf), &gg) ) {
-                p_udesc = NULL;
-		close(kc->fd);
-                free(kc);
-                return p_udesc;
-            }
+     return p_udesc;
 
-            strncpy(p_udesc->user, pwd->pw_name, sizeof(p_udesc->user)-1);
-            strncpy(p_udesc->group, gg->gr_name, sizeof(p_udesc->group)-1);
-            p_udesc->conn = kc;
+err:
+     dbuspolicy1_free(p_udesc);
+     if (kc && kc->fd != -1)
+	  close(kc->fd);
+     free(kc);
+     free(p_udesc);
 
-            fdl = open("/proc/self/attr/current", 0, S_IRUSR);
-            if (fdl < 0)
-            {
-                dbuspolicy1_free(p_udesc);
-                return NULL;
-            }
-
-            r = read(fdl, p_udesc->label, 256);
-            if (r < 0)
-            {
-                close(fdl);
-                dbuspolicy1_free(p_udesc);
-                return NULL;
-            }
-            close(fdl);
-
-
-        }
-    } else {
-        p_udesc = NULL;
-	close(kc->fd);
-        free(kc);
-    }
-    return p_udesc;
+     return NULL;
 }
 
 DBUSPOLICY1_EXPORT void dbuspolicy1_free(void* configuration)
