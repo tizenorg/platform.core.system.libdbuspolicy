@@ -89,8 +89,6 @@ struct udesc {
     struct kconn* conn;
 };
 
-static void print_udesc(const char* const entry, const struct udesc* const p_udesc) {
-}
 
 static int kdbus_open_system_bus(void)
 {
@@ -249,7 +247,6 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
 
     r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_PRIMARY : SESSION_BUS_CONF_FILE_PRIMARY);
     if(r < 0) {
-        printf("Failed to parse primary config file, trying secondary config...\n");
         r = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY);
     }
     if(r >= 0) {
@@ -286,7 +283,6 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
             fdl = open("/proc/self/attr/current", 0, S_IRUSR);
             if (fdl < 0)
             {
-                fprintf(stderr,"Cannot open /proc/self/attr/current\n");
                 dbuspolicy1_free(p_udesc);
                 return NULL;
             }
@@ -294,7 +290,6 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
             r = read(fdl, p_udesc->label, 256);
             if (r < 0)
             {
-                fprintf(stderr, "Cannot read from /proc/self/attr/current\n");
                 close(fdl);
                 dbuspolicy1_free(p_udesc);
                 return NULL;
@@ -302,7 +297,6 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
             close(fdl);
 
 
-            print_udesc("New configuration", p_udesc);
         }
     } else {
         p_udesc = NULL;
@@ -316,7 +310,6 @@ DBUSPOLICY1_EXPORT void dbuspolicy1_free(void* configuration)
 {
     struct udesc* p_udesc = (struct udesc*)configuration;
     if(p_udesc) {
-        print_udesc("Freeing configuration", p_udesc);
 	close(p_udesc->conn->fd);
         free(p_udesc->conn);
         free(p_udesc);
