@@ -131,7 +131,7 @@ static int kdbus_get_creds_from_name(struct kconn* kc, struct kcreds* kcr, const
     struct kdbus_info* conn_info;
     struct kdbus_item *item;
     char** tmp_names;
-    int j, r, l, counter, type;
+    int j, r, l, counter;
     unsigned int size;
 
     counter = 0;
