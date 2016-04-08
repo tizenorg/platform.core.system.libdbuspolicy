@@ -36,7 +36,7 @@ cp %{SOURCE1001} .
 make
 
 %install
-make DESTDIR=%{buildroot} install-strip
+make DESTDIR=%{buildroot} install
 rm %{buildroot}%{_libdir}/libdbuspolicy1.la
 
 %post -p /sbin/ldconfig
