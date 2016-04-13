@@ -26,4 +26,7 @@
 
 #define DBUSPOLICY1_EXPORT __attribute__ ((visibility("default")))
 
+typedef uint8_t dbus_name_len;
+#define MAX_DBUS_NAME_LEN 255
+
 #endif

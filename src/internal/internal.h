@@ -22,8 +22,13 @@ extern "C" {
 #endif
 
 int __internal_init(unsigned int bus_type, const char* const config_name);
+void __internal_init_once(void);
+extern pthread_mutex_t g_mutex;
+void __internal_init_flush_logs(void);
+void __internal_enter(void);
+void __internal_exit(void);
 
-int __internal_can_send(unsigned int bus_type,
+int __internal_can_send(bool bus_type,
                             const char* const user,
                             const char* const group,
                             const char* const label,
@@ -33,7 +38,7 @@ int __internal_can_send(unsigned int bus_type,
                             const char* const member,
                             int type);
 
-int __internal_can_recv(unsigned int bus_type,
+int __internal_can_recv(bool bus_type,
                             const char* const user,
                             const char* const group,
                             const char* const label,
@@ -43,7 +48,7 @@ int __internal_can_recv(unsigned int bus_type,
                             const char* const member,
                             int type);
 
-int __internal_can_own(unsigned int bus_type,
+int __internal_can_own(bool bus_type,
                             const char* const user,
                             const char* const group,
                             const char* const service);

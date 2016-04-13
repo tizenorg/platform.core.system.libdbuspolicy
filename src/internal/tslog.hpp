@@ -19,87 +19,26 @@
 
 #include <iostream>
 #include <thread>
-#include <mutex>
+#include <pthread.h>
 #include <stdlib.h>
 
-namespace _ldp_tslog
+typedef std::ostream& (*t_ManFun)(std::ostream&);
+
+namespace tslog
 {
-    typedef std::ostream& (*t_ManFun)(std::ostream&);
+	int8_t g_verbosity; // <0 disable 0 brief >0 verbose
 
-    namespace {
-        static constexpr bool LOG_DEFAULT_ENABLE = false;
-        static constexpr bool LOG_DEFAULT_VERBOSE = false;
-        static const std::string LDP_ENV_VERBOSE_NAME = "LDP_VERBOSE";
-        static const std::string LDP_ENV_LOG_NAME = "LDP_LOG";
+	bool get_log_env(char const *name) {
+		char const *ldp_log_mode = getenv(name);
+		return ldp_log_mode && '0' != *ldp_log_mode;
+	}
 
-        const bool get_log_env(const std::string& name) {
-            bool bret;
-            char* ldp_log_mode = getenv(name.c_str());
-            if(ldp_log_mode) {
-                const std::string slog(ldp_log_mode);
-                bret = (slog == "0") ? false : true;
-            } else {
-                bret = (name == LDP_ENV_LOG_NAME) ? LOG_DEFAULT_ENABLE : LOG_DEFAULT_VERBOSE;
-            }
-            return bret;
-        }
-    }
+	void init() {
+		g_verbosity = get_log_env("LDP_LOG") ? get_log_env("LDP_VERBOSE") : -1;
+	}
 
-    const bool get_verbose() {
-        return get_log_env(LDP_ENV_VERBOSE_NAME);
-    }
-
-    const bool get_enable() {
-        return get_log_env(LDP_ENV_LOG_NAME);
-    }
-
-    class TsLog
-    {
-        private:
-            static bool m_verbose;
-            static std::mutex m_mtx;
-            std::ostream& m_os;
-            bool m_enable;
-
-            template<typename T>
-                TsLog& lckLog(const T& t) {
-                    if(m_enable) {
-                        std::unique_lock<std::mutex> lck(m_mtx);
-                        m_os << t;
-                    }
-                    return *this;
-                }
-
-        public:
-            TsLog() = delete;
-
-            explicit TsLog(std::ostream& os, bool enable = true)
-                : m_os(os), m_enable(enable) {}
-
-            virtual ~TsLog() {}
-
-            template<typename T>
-                TsLog& operator<< (const T& t) {
-                    return lckLog<T>(t);
-                }
-
-            TsLog& operator<< (t_ManFun f) {
-                return lckLog<t_ManFun>(f);
-            }
-
-    };
-    std::mutex TsLog::m_mtx;
+	bool enabled() { return g_verbosity >= 0; }
+	bool verbose() { return g_verbosity > 0; }
 }
-
-namespace {
-    //Thread-safe loggers
-    _ldp_tslog::TsLog tout(std::cout, _ldp_tslog::get_enable());
-    _ldp_tslog::TsLog terr(std::cerr, _ldp_tslog::get_enable());
-
-    namespace verbose {
-        _ldp_tslog::TsLog tout(std::cout, _ldp_tslog::get_enable() && _ldp_tslog::get_verbose());
-        _ldp_tslog::TsLog terr(std::cerr, _ldp_tslog::get_enable() && _ldp_tslog::get_verbose());
-    }
-} //namespace
 
 #endif
