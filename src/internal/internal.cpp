@@ -23,12 +23,18 @@
 extern "C" {
 #endif
 
-static const char* get_bus(int bus_type) {
-    return (bus_type == SYSTEM_BUS) ? "SYSTEM" : "SESSION";
-}
-
 static const char* get_str(const char* const szstr) {
     return (szstr != NULL) ? szstr : "";
+}
+
+static std::string get_strv(const char *s) {
+	unsigned i = 0;
+	if (s) {
+		i = -1;
+		char c;
+		while ((c = s[++i]) && ' ' != c);
+	}
+	return std::string{s, i};
 }
 
 static const char* get_message_type(int type) {
@@ -43,14 +49,41 @@ static const char* get_message_type(int type) {
     return sztype;
 }
 
-int __internal_init(unsigned int bus_type, const char* const config_name)
+int __internal_init(bool bus_type, const char* const config_name)
 {
-    _ldp_xml_parser::XmlAsyncParser p;
-    auto err = p.parse_policy(get_bus(bus_type), get_str(config_name));
+    _ldp_xml_parser::XmlParser p;
+    auto err = p.parse_policy(bus_type, get_str(config_name));
     return err.get();
 }
 
-int __internal_can_send(unsigned int bus_type,
+pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void __internal_init_once()
+{
+	tslog::init();
+}
+
+void __internal_init_flush_logs()
+{
+	if (tslog::enabled()) {
+		pthread_mutex_lock(&g_mutex);
+		std::cout << std::flush;
+		pthread_mutex_unlock(&g_mutex);
+	}
+}
+
+void __internal_enter()
+{
+	if (tslog::enabled())
+		pthread_mutex_lock(&g_mutex);
+}
+void __internal_exit()
+{
+	if (tslog::enabled())
+		pthread_mutex_unlock(&g_mutex);
+}
+
+int __internal_can_send(bool bus_type,
                             const char* const user,
                             const char* const group,
                             const char* const label,
@@ -60,12 +93,12 @@ int __internal_can_send(unsigned int bus_type,
                             const char* const member,
                             int type)
 {
-    _ldp_xml_parser::XmlAsyncParser p;
-    auto err = p.can_send(get_bus(bus_type), get_str(user), get_str(group), get_str(label), get_str(destination), get_str(path), get_str(interface), get_str(member), get_message_type(type));
+    _ldp_xml_parser::XmlParser p;
+    auto err = p.can_send(bus_type, get_str(user), get_str(group), get_str(label), get_strv(destination), get_str(path), get_str(interface), get_str(member), get_message_type(type));
     return err.get();
 }
 
-int __internal_can_recv(unsigned int bus_type,
+int __internal_can_recv(bool bus_type,
                             const char* const user,
                             const char* const group,
                             const char* const label,
@@ -75,18 +108,18 @@ int __internal_can_recv(unsigned int bus_type,
                             const char* const member,
                             int type)
 {
-    _ldp_xml_parser::XmlAsyncParser p;
-    auto err = p.can_recv(get_bus(bus_type), get_str(user), get_str(group), get_str(label), get_str(sender), get_str(path), get_str(interface), get_str(member), get_message_type(type));
+    _ldp_xml_parser::XmlParser p;
+    auto err = p.can_recv(bus_type, get_str(user), get_str(group), get_str(label), get_strv(sender), get_str(path), get_str(interface), get_str(member), get_message_type(type));
     return err.get();
 }
 
-int __internal_can_own(unsigned int bus_type,
+int __internal_can_own(bool bus_type,
                             const char* const user,
                             const char* const group,
                             const char* const service)
 {
-    _ldp_xml_parser::XmlAsyncParser p;
-    auto err = p.can_own(get_bus(bus_type), get_str(user), get_str(group), get_str(service));
+    _ldp_xml_parser::XmlParser p;
+    auto err = p.can_own(bus_type, get_str(user), get_str(group), get_str(service));
     return err.get();
 }
 

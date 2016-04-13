@@ -29,8 +29,8 @@ extern "C" {
 #define SYSTEM_BUS_CONF_FILE_SECONDARY  "/etc/dbus-1/system-local.conf"
 #define SESSION_BUS_CONF_FILE_SECONDARY "/etc/dbus-1/session-local.conf"
 
-#define SYSTEM_BUS   1
-#define SESSION_BUS  2
+#define SYSTEM_BUS   0
+#define SESSION_BUS  1
 
 /** used when check policy for message prepared to send */
 #define DBUSPOLICY_DIRECTION_SENDING 0

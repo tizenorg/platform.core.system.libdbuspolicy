@@ -19,6 +19,12 @@
 
 #include <string>
 
+namespace arraySizeDetail {
+	template <class T, size_t S> constexpr size_t size(T const (&)[S]) { return S; }
+	template <class T> constexpr size_t size(std::initializer_list<T> const &l) { return l.size(); }
+}
+#define TABSIZE(...) (::arraySizeDetail::size(__VA_ARGS__))
+
 namespace {
     class ErrCode {
         int m_err;
@@ -26,7 +32,6 @@ namespace {
         ErrCode(int e, const std::string& s) : m_err(e), m_err_str(s) {}
         public:
             ErrCode() : m_err(0), m_err_str("") {}
-            virtual ~ErrCode() {}
 
             static ErrCode ok() {
                 return ErrCode(0, "OK");
@@ -39,10 +44,6 @@ namespace {
 
             static ErrCode error(const std::string& what) {
                 return ErrCode(-1, what);
-            }
-
-            static ErrCode timeout(const std::string& what) {
-                return ErrCode(-99, std::string("Timeout: ") + what);
             }
 
             int get() const {

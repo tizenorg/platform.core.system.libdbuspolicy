@@ -20,10 +20,16 @@
 #include <boost/noncopyable.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <map>
 #include "libdbuspolicy1-private.hpp"
-#include "timer.hpp"
 #include "tslog.hpp"
 #include "cynara.hpp"
+
+enum class TreeType : uint8_t {
+	SEND,
+	RECV,
+	OWN
+};
 
 namespace _ldp_xml_parser
 {
@@ -56,7 +62,6 @@ namespace _ldp_xml_parser
                 static const size_t IDX_OWN_LENGTH = IDX_SERVICE + 1;
                 static const size_t IDX_DEFAULT = IDX_GROUP + 1;
 
-                std::string m_bus;
                 std::vector<std::string> m_path_content;
                 std::string m_privilege;
                 bool m_bsend;
@@ -66,9 +71,8 @@ namespace _ldp_xml_parser
                 bool m_ballow;
                 static size_t m_weight;
 
-                Key(const std::string& bus)
-                    : m_bus(bus),
-                    m_path_content(std::vector<std::string>(IDX_TOTAL_LENGTH, ANY)),
+                Key(bool bus)
+                    : m_path_content(std::vector<std::string>(IDX_TOTAL_LENGTH, ANY)),
                     m_bsend(false),
                     m_brecv(false),
                     m_bown(false),
@@ -85,9 +89,8 @@ namespace _ldp_xml_parser
                 const std::string get_path() const {
                     std::string path = "R";
                     auto it_cend = m_bown ? m_path_content.cbegin() + IDX_OWN_LENGTH : m_path_content.cend();
-                    for(auto it = m_path_content.cbegin(); it != it_cend; ++it) {
-                        path += (std::string(1, Key::DELIM) + *it);
-                    }
+                    for(auto it = m_path_content.cbegin(); it != it_cend; ++it)
+                        (path += Key::DELIM) += *it;
                     return path;
                 }
         };
@@ -121,11 +124,10 @@ namespace _ldp_xml_parser
             }
 
             friend std::ostream& operator<<(std::ostream& os, const Leaf& lf) {
-                if(lf.m_check) {
+                if(lf.m_check)
                     os << "check," << lf.m_privilege << "," << lf.m_weight;
-                } else {
+                else
                     os << (lf.m_decision ? "true" : "false") << "," << lf.m_weight;
-                }
                 return os;
             }
 
@@ -138,24 +140,20 @@ namespace _ldp_xml_parser
                 for(auto it = tokens.begin(); it != tokens.end(); ++it) {
                     const auto it_last = std::next(tokens.begin(), size - 1);
                     if(it == tokens.begin()) {
-                        if(size > 2) {
+                        if(size > 2)
                             lf.m_check = (*it == "check") ? true : false;
-                        } else {
+                        else
                             lf.m_decision = (*it == "true") ? true : false;
-                        }
-                    } else if(it == it_last) {
+                    } else if(it == it_last)
                         lf.m_weight = std::stoul(*it);
-                    } else {
-                        if(size > 2) {
-                            lf.m_privilege = *it;
-                        }
-                    }
+                    else if(size > 2)
+						lf.m_privilege = *it;
                 }
                 return is;
             }
         };
 
-        static const std::string get_context_str(const CtxType& ctx_type) {
+        static char const *get_context_str(const CtxType& ctx_type) {
             switch(ctx_type) {
                 case CtxType::DEFAULT: return "(default)"; break;
                 case CtxType::SPECIFIC: return "(specific)"; break;
@@ -165,34 +163,24 @@ namespace _ldp_xml_parser
         }
 
         static const std::string get_field_str(const std::string& field) {
-            return (field == "") ? Key::ANY : field;
+            return field == "" ? Key::ANY : field;
         }
 
         //Data obtained from XML parsing - decision trees
-        typedef std::map<std::string, boost::property_tree::ptree> Trees_t;
-        std::map<std::string, Trees_t> m_dec_trees;
-        std::mutex m_xml_policy_mtx;
+        boost::property_tree::ptree m_dec_trees[2][3];
 
-        boost::property_tree::ptree* get_decision_tree(const std::string& bus, const std::string& tree_type) {
-            boost::property_tree::ptree* p_tree = NULL;
-
-            auto it1 = m_dec_trees.find(bus);
-            if(it1 != m_dec_trees.end()) {
-                auto it2 = it1->second.find(tree_type);
-                if(it2 != it1->second.end()) {
-                    p_tree = &it2->second;
-                }
-            }
-            return p_tree;
+        boost::property_tree::ptree &get_decision_tree(bool bus, TreeType tree_type) {
+            return m_dec_trees[bus][static_cast<unsigned>(tree_type)];
         }
 
-        boost::property_tree::ptree* get_decision_tree(const Key& key) {
-            std::string tree_type;
-            if(key.m_bsend) { tree_type = "SEND"; }
-            else if(key.m_brecv) { tree_type = "RECV"; }
-            else if(key.m_bown) { tree_type = "OWN"; }
+        boost::property_tree::ptree* get_decision_tree(bool bus, const Key& key) {
+            TreeType tree_type;
+            if(key.m_bsend) tree_type = TreeType::SEND;
+            else if(key.m_brecv) tree_type = TreeType::RECV;
+            else if(key.m_bown) tree_type = TreeType::OWN;
+			else return NULL;
 
-            return get_decision_tree(key.m_bus, tree_type);
+            return &get_decision_tree(bus, tree_type);
         }
 
         void print_decision_tree(const boost::property_tree::ptree& pt, int level = 0) {
@@ -202,31 +190,30 @@ namespace _ldp_xml_parser
             }
         }
 
-        void print_decision_key(const Key& key) {
-            if(_ldp_tslog::get_verbose()) {
-                std::string s = key.m_bus + " ";
-                if(key.m_bsend && !key.m_brecv) { s += "--> #"; }
-                if(!key.m_bsend && key.m_brecv) { s += "<-- #"; }
-                if(!key.m_bsend && !key.m_brecv && key.m_bown) { s += "OWN #"; }
+        void print_decision_key(bool bus, const Key& key) {
+            if (tslog::verbose()) {
+                std::string s = bus + " ";
+                if(key.m_bsend && !key.m_brecv) s += "--> #";
+                if(!key.m_bsend && key.m_brecv) s += "<-- #";
+                if(!key.m_bsend && !key.m_brecv && key.m_bown) s += "OWN #";
                 std::string prv = key.m_bcheck ? key.m_privilege : "";
-                verbose::tout << s
+                std::cout << s
                     << (key.m_bcheck ? "check " : std::to_string(key.m_ballow))
                     << prv
                     << " : "
                     << key.get_path()
                     << "    (weight: "
                     << key.m_weight
-                    << ")"
-                    << std::endl;
+                    << ")\n";
             }
         }
 
-        void update_decision_tree(const Key& key) {
+        void update_decision_tree(bool bus, const Key& key) {
             if(!key.get_path().empty()) {
-                print_decision_key(key);
+                print_decision_key(bus, key);
 
                 //update
-                boost::property_tree::ptree* const p_tree = get_decision_tree(key);
+                boost::property_tree::ptree* const p_tree = get_decision_tree(bus, key);
                 if(p_tree) {
                     boost::property_tree::ptree::path_type tpath(key.get_path(), Key::DELIM);
                     p_tree->put(tpath, Leaf(key.m_ballow, key.m_bcheck, key.m_privilege, key.m_weight));
@@ -260,7 +247,7 @@ namespace _ldp_xml_parser
                 ++key.m_weight;
             } else {
                 if(attr) {
-                    std::string data_str = (v.second.data() == "*") ? Key::ANY : v.second.data();
+                    std::string data_str = v.second.data() == "*" ? Key::ANY : v.second.data();
                     if(v.first == "context") {
                         if(data_str == "mandatory") {
                             key.m_path_content[Key::IDX_USER] = Key::MRY;
@@ -272,20 +259,16 @@ namespace _ldp_xml_parser
                             current_ctx = CtxType::DEFAULT;
                         }
                     } else if(v.first == "user") {
-                        if(current_ctx == CtxType::SPECIFIC) {
+                        if(current_ctx == CtxType::SPECIFIC)
                             key.m_path_content[Key::IDX_USER] = data_str;
-                        }
                     } else if(v.first == "group") {
-                        if(current_ctx == CtxType::SPECIFIC) {
+                        if(current_ctx == CtxType::SPECIFIC)
                             key.m_path_content[Key::IDX_GROUP] = data_str;
-                        }
                     } else {
-                        if(field_has(v, "send_")) {
+                        if(field_has(v, "send_"))
                             key.m_bsend = true;
-                        }
-                        if(field_has(v, "receive_")) {
+                        if(field_has(v, "receive_"))
                             key.m_brecv = true;
-                        }
                         if(v.first == "own") {
                             key.m_bown = true;
                             key.m_path_content[Key::IDX_SERVICE] = data_str;
@@ -294,27 +277,20 @@ namespace _ldp_xml_parser
                             key.m_bown = true;
                             key.m_path_content[Key::IDX_SERVICE] = data_str + "*";
                         }
-                        if(field_has(v, "_destination")) {
+                        if(field_has(v, "_destination"))
                             key.m_path_content[Key::IDX_DEST] = data_str;
-                        }
-                        if(field_has(v, "_sender")) {
+                        if(field_has(v, "_sender"))
                             key.m_path_content[Key::IDX_SENDER] = data_str;
-                        }
-                        if(field_has(v, "_path")) {
+                        if(field_has(v, "_path"))
                             key.m_path_content[Key::IDX_PATH] = data_str;
-                        }
-                        if(field_has(v, "_interface")) {
+                        if(field_has(v, "_interface"))
                             key.m_path_content[Key::IDX_IFACE] = data_str;
-                        }
-                        if(field_has(v, "_member")) {
+                        if(field_has(v, "_member"))
                             key.m_path_content[Key::IDX_MEMBER] = data_str;
-                        }
-                        if(field_has(v, "_type")) {
+                        if(field_has(v, "_type"))
                             key.m_path_content[Key::IDX_TYPE] = data_str;
-                        }
-                        if(v.first == "privilege") {
+                        if(v.first == "privilege")
                             key.m_privilege = data_str;
-                        }
 
                         key.m_bcheck = bcheck;
                         key.m_ballow = allden;
@@ -328,14 +304,15 @@ namespace _ldp_xml_parser
         }
 
         void print_field(const boost::property_tree::ptree::value_type& v, int level) {
-            verbose::tout    << ((level > 0) ? std::string((level - 1) * 8, ' ') + std::string(8, '.') : "")
-                << v.first
-                << " : "
-                << v.second.data()
-                << std::endl;
+			std::cout << ((level > 0) ? std::string((level - 1) * 8, ' ') + std::string(8, '.') : "")
+				<< v.first
+				<< " : "
+				<< v.second.data()
+				<< '\n';
         }
 
-        void xml_traversal(const boost::property_tree::ptree& pt,
+        void xml_traversal(bool bus,
+				const boost::property_tree::ptree& pt,
                 Key& key,
                 CtxType& current_ctx,
                 bool allden = false,
@@ -349,20 +326,18 @@ namespace _ldp_xml_parser
                     if(v.first == "<xmlcomment>") { continue; }
 
                     update_decision_path(v, key, current_ctx, allden, bcheck, attr);
-                    //print_field(v, level);
-                    xml_traversal(v.second, key, current_ctx, allden, bcheck, attr, level + 1);
+                    //if (tslog::verbose()) print_field(v, level);
+                    xml_traversal(bus, v.second, key, current_ctx, allden, bcheck, attr, level + 1);
                 }
 
-                if(!pt.empty() && attr && level > 1) {
-                    update_decision_tree(key);
-                }
-            } else {
-                terr << "XML traversal max level reached: " << level << std::endl;
-            }
+                if(!pt.empty() && attr && level > 1)
+                    update_decision_tree(bus, key);
+            } else if (tslog::enabled())
+                std::cout << "XML traversal max level reached: " << level << '\n';
         }
 
         void print_indexing_path(size_t idx, const std::string& path, const Leaf& leaf = Leaf(), bool empty = true) {
-            if(_ldp_tslog::get_verbose()) {
+            if (tslog::verbose()) {
                 std::string s;
                 if(!empty) {
                     s = "    : <";
@@ -373,72 +348,79 @@ namespace _ldp_xml_parser
                     s += std::string(">");
                 }
 
-                verbose::tout << "path #"
-                    << idx
-                    << " : "
-                    << path
-                    << s
-                    << std::endl;
+				std::cout << "path #"
+					<< idx
+					<< " : "
+					<< path
+					<< s
+					<< '\n';
             }
         }
 
         void prepare_indexing_path(const std::vector<std::string>& idx_v,
-                const size_t pattern,
+                size_t pattern,
                 const size_t usrgrp_obfuscate_order,
                 const bool obfuscate_params,
                 const CtxType& ctx_type,
                 std::string& path) {
 
-            const size_t offset = Key::IDX_DEFAULT;
+            constexpr size_t offset = Key::IDX_DEFAULT;
             path = "R";
 
             if(ctx_type == CtxType::SPECIFIC) {
-                switch(usrgrp_obfuscate_order) {
-                    case 0:
-                        path += (std::string(1, Key::DELIM) + get_field_str(idx_v[Key::IDX_USER]));
-                        path += (std::string(1, Key::DELIM) + Key::ANY);
-                    break;
-                    case 1:
-                        path += (std::string(1, Key::DELIM) + Key::ANY);
-                        path += (std::string(1, Key::DELIM) + get_field_str(idx_v[Key::IDX_GROUP]));
-                    break;
-                    case 2:
-                        path += (std::string(1, Key::DELIM) + get_field_str(idx_v[Key::IDX_USER]));
-                        path += (std::string(1, Key::DELIM) + get_field_str(idx_v[Key::IDX_GROUP]));
-                    break;
-                    case 3:
-                    default:
-                        path += (std::string(1, Key::DELIM) + Key::ANY);
-                        path += (std::string(1, Key::DELIM) + Key::ANY);
-                    break;
-                }
-            } else {
-                for(size_t i = 0; i < offset; ++i) {
-                    const std::string as = (ctx_type == CtxType::MANDATORY) ? Key::MRY : Key::DEF;
-                    path += (std::string(1, Key::DELIM) + as);
-                }
-            }
+				path += Key::DELIM;
+				if (usrgrp_obfuscate_order & 1) // 1 3
+					path += Key::ANY;
+				else
+					path += get_field_str(idx_v[Key::IDX_USER]);
+				path += Key::DELIM;
+				if ((usrgrp_obfuscate_order+1) & 2) // 1 2
+					path += get_field_str(idx_v[Key::IDX_GROUP]);
+				else
+					path += Key::ANY;
 
-            const size_t m = 1;
+                // switch(usrgrp_obfuscate_order) {
+                //     case 0:
+                //         path += get_field_str(idx_v[Key::IDX_USER]);
+                //         (path += Key::DELIM) += Key::ANY;
+                //     break;
+                //     case 1:
+                //         path += Key::ANY;
+                //         (path += Key::DELIM) += get_field_str(idx_v[Key::IDX_GROUP]);
+                //     break;
+                //     case 2:
+                //         path += get_field_str(idx_v[Key::IDX_USER]);
+                //         (path += Key::DELIM) += get_field_str(idx_v[Key::IDX_GROUP]);
+                //     break;
+                //     case 3:
+                //     default:
+                //         path += Key::ANY;
+                //         (path += Key::DELIM) += Key::ANY;
+                //     break;
+                // }
+            } else
+                for(size_t i = 0; i < offset; ++i)
+                    (path += Key::DELIM) += ctx_type == CtxType::MANDATORY ? Key::MRY : Key::DEF;
+
             const size_t n = idx_v.size() - offset;
-            for(size_t i = 0; i < n; ++i) {
-                std::string s = get_field_str(idx_v[i + offset]);
+            for (size_t i = 0; i < n; ++i) {
                 path += Key::DELIM;
-                if(obfuscate_params && (pattern & (m << i))) {
-                    path += Key::ANY;
-                } else {
-                    path += s;
-                }
+				if (obfuscate_params && pattern & 1)
+					path += Key::ANY;
+				else
+					path += get_field_str(idx_v[i + offset]);
+				pattern >>= 1;
             }
         }
 
         ErrCode service_leaf_found(const Leaf& leaf, const std::string& label, const std::vector<std::string>& idx_v) {
             ErrCode err;
             if(leaf.get_check()) {
-                verbose::tout << __func__
-                    << ": cynara check needed for privilege " << leaf.get_privilege()
-                    << ", weight " << leaf.get_weight()
-                    << std::endl;
+				if (tslog::verbose())
+					std::cout << __func__
+						<< ": cynara check needed for privilege " << leaf.get_privilege()
+						<< ", weight " << leaf.get_weight()
+						<< '\n';
 
                 //cynara check
                 try {
@@ -487,14 +469,16 @@ namespace _ldp_xml_parser
                         if(!found) { err = ErrCode::error("No path"); }
                     } catch(...) {
                         print_indexing_path(p, path);
-                        verbose::tout << "Unknown exception while indexing decision tree!" << std::endl;
+						if (tslog::verbose())
+							std::cout << "Unknown exception while indexing decision tree!\n";
                         if(!found) { err = ErrCode::error("Unknown err, no path"); }
                     }
                 }
 
                 if(found) {
                     err = service_leaf_found(leaf_found, label, idx_v);
-                    verbose::tout << __func__ << ": returning decision #" << err.get() << " " << err.get_str() << ", weight " << leaf_found.get_weight() << std::endl;
+					if (tslog::verbose())
+						std::cout << __func__ << ": returning decision #" << err.get() << " " << err.get_str() << ", weight " << leaf_found.get_weight() << '\n';
                     break;
                 }
             }
@@ -509,85 +493,63 @@ namespace _ldp_xml_parser
             const CtxType& ctx_type) {
             ErrCode err;
 
-            tout << "context: " << get_context_str(ctx_type) << ",  indexing arguments: ";
-            if(_ldp_tslog::get_enable()) { std::copy(idx_v.begin(), idx_v.end(), std::ostream_iterator<std::string>(std::cout, ", ")); }
-            tout << std::endl;
+			if (tslog::enabled()) {
+				std::cout << "context: " << get_context_str(ctx_type) << ",  indexing arguments: ";
+				std::copy(idx_v.begin(), idx_v.end(), std::ostream_iterator<std::string>(std::cout, ", "));
+				std::cout << '\n';
+			}
 
             //Examine policy data and make decision
-            _ldp_timer::microsec latency;
-            {
-                _ldp_timer::Timer<_ldp_timer::microsec> t(&latency);
-                err = index_decision_tree(pt, idx_v, label, obfuscate_params, ctx_type);
-            }
+			err = index_decision_tree(pt, idx_v, label, obfuscate_params, ctx_type);
 
-            tout << __func__ << ": #" << err.get() << " " << err.get_str() << " " << get_context_str(ctx_type) << std::endl;
-            tout << "tree indexing latency: " << latency << std::endl;
+			if (tslog::enabled())
+				std::cout << __func__ << ": #" << err.get() << " " << err.get_str() << " " << get_context_str(ctx_type) << '\n';
             return err;
         }
 
-        ErrCode can_do_action(const std::string& bus,
-                const std::string& tree_type,
+        ErrCode can_do_action(bool bus,
+                TreeType tree_type,
                 const std::vector<std::string>& idx_v,
                 const std::string& label = "",
                 const bool analyze_prefix = false) {
-            std::unique_lock<std::mutex> lck(m_xml_policy_mtx);
             ErrCode err;
-            boost::property_tree::ptree* const p_tree = get_decision_tree(bus, tree_type);
-            if(p_tree) {
-                err = index_decision_tree_lat(*p_tree, idx_v, label, !analyze_prefix, CtxType::MANDATORY);
-                if(!err.is_ok()) {
-                    err = index_decision_tree_lat(*p_tree, idx_v, label, !analyze_prefix, CtxType::SPECIFIC);
-                    if(!err.is_ok()) {
-                        err = index_decision_tree_lat(*p_tree, idx_v, label, !analyze_prefix, CtxType::DEFAULT);
-                    }
-                }
-            } else {
-                err = ErrCode::error("Get decision tree returned NULL ptr");
-            }
-            tout << __func__ << ": #" << err.get()  << " " << err.get_str() << std::endl;
+            boost::property_tree::ptree const &p_tree = get_decision_tree(bus, tree_type);
+			err = index_decision_tree_lat(p_tree, idx_v, label, !analyze_prefix, CtxType::MANDATORY);
+			if(!err.is_ok()) {
+				err = index_decision_tree_lat(p_tree, idx_v, label, !analyze_prefix, CtxType::SPECIFIC);
+				if(!err.is_ok())
+					err = index_decision_tree_lat(p_tree, idx_v, label, !analyze_prefix, CtxType::DEFAULT);
+			}
+			if (tslog::enabled())
+				std::cout << __func__ << ": #" << err.get()  << " " << err.get_str() << '\n';
             return err;
         }
 
         public:
         XmlPolicy() {
-            Trees_t t;
-            t.emplace("SEND", typename Trees_t::mapped_type());
-            t.emplace("RECV", typename Trees_t::mapped_type());
-            t.emplace("OWN", typename Trees_t::mapped_type());
-            m_dec_trees.emplace("SYSTEM", t);
-            m_dec_trees.emplace("SESSION", t);
-        }
-
-        virtual ~XmlPolicy() {}
-
-        void init() {
-            std::unique_lock<std::mutex> lck(m_xml_policy_mtx);
             Key::m_weight = 0;
         }
 
-        void update(const std::string& bus, const boost::property_tree::ptree& pt) {
-            if(!pt.empty()) {
-                std::unique_lock<std::mutex> lck(m_xml_policy_mtx);
-                const auto& children = pt.get_child(ROOT_FIELD);
-                for(const auto& x : children) {
-                    if(x.first == ROOT_POLICY) {
-                        Key key(bus);
-                        CtxType current_ctx = CtxType::SPECIFIC;
-                        xml_traversal(x.second, key, current_ctx);
-                    }
-                }
-            }
+        void update(bool bus, const boost::property_tree::ptree& pt) {
+			const auto& children = pt.get_child(ROOT_FIELD);
+			for(const auto& x : children) {
+				if(x.first == ROOT_POLICY) {
+					Key key(bus);
+					CtxType current_ctx = CtxType::SPECIFIC;
+					xml_traversal(bus, x.second, key, current_ctx);
+				}
+			}
         }
 
-        ErrCode can_send_to(const std::string bus, const std::vector<std::string>& idx_v, const std::string label) {
-            return can_do_action(bus, "SEND", idx_v, label);
+        ErrCode can_send_to(bool bus, const std::vector<std::string>& idx_v, const std::string label) {
+            return can_do_action(bus, TreeType::SEND, idx_v, label);
         }
 
-        ErrCode can_recv_from(const std::string bus, const std::vector<std::string>& idx_v, const std::string label) {
-            return can_do_action(bus, "RECV", idx_v, label);
+        ErrCode can_recv_from(bool bus, const std::vector<std::string>& idx_v, const std::string label) {
+            return can_do_action(bus, TreeType::RECV, idx_v, label);
         }
 
-        ErrCode can_own_what(const std::string bus, const std::vector<std::string>& idx_v) {
+        ErrCode can_own_what(bool bus, const std::vector<std::string>& idx_v) {
             ErrCode err;
 
             //Evaluate own_prefix
@@ -596,34 +558,29 @@ namespace _ldp_xml_parser
             const size_t srv_size = srv.size();
             for(size_t n = 1; n <= srv_size; ++n) {
                 const std::string sub = srv.substr(0, n) + "*";
-                verbose::tout << "own_prefix: " << sub << std::endl;
+				if (tslog::enabled())
+					std::cout << "own_prefix: " << sub << '\n';
                 iv.pop_back();
                 iv.push_back(sub);
-                err = can_do_action(bus, "OWN", iv, "", true);
-                if(err.is_ok()) {
+                err = can_do_action(bus, TreeType::OWN, iv, "", true);
+                if(err.is_ok())
                     break;
-                }
             }
 
             //Evaluate own
-            if(err.is_error()) {
-                err = can_do_action(bus, "OWN", idx_v);
-            }
+            if(err.is_error())
+                err = can_do_action(bus, TreeType::OWN, idx_v);
 
             return err;
         }
 
-        void print_decision_trees() {
-            if(_ldp_tslog::get_verbose()) {
-                std::unique_lock<std::mutex> lck(m_xml_policy_mtx);
-
-                for(const auto& x : m_dec_trees) {
-                    for(const auto& y : x.second) {
-                        verbose::tout << x.first << " " << y.first << " " << (y.second.empty() ? "(empty)" : "") << std::endl;
+        void print_decision_trees(bool bus) {
+            if (tslog::verbose())
+				for (unsigned i = 0; i < TABSIZE(m_dec_trees[bus]); ++i)
+                    for(auto const& y : m_dec_trees[bus][i]) {
+                        std::cout << i << " " << y.first << " " << (y.second.empty() ? "(empty)" : "") << '\n';
                         print_decision_tree(y.second);
                     }
-                }
-            }
         }
 
     }; //XmlPolicy
