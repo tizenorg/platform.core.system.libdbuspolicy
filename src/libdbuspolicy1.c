@@ -301,7 +301,6 @@ err:
      if (kc && kc->fd != -1)
 	  close(kc->fd);
      free(kc);
-     free(p_udesc);
 
      return NULL;
 }
