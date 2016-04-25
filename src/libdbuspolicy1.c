@@ -246,6 +246,9 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      if (getgrgid_r(p_udesc->gid, &grent, buf, sizeof(buf), &gg))
 	  return -1;
 
+     if (!pwd || !gg)
+          return -1;
+
      len = sizeof(p_udesc->user) - 1;
      strncpy(p_udesc->user, pwd->pw_name, len);
      p_udesc->group[len] = 0;
