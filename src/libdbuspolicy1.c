@@ -280,8 +280,7 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
      struct udesc* p_udesc = NULL;
 
      kc = (struct kconn*) calloc(1, sizeof(struct kconn));
-     p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
-     if (!kc || !p_udesc)
+     if (!kc)
 	  goto err;
 
      if ((kc->fd = kdbus_open_system_bus()) < 0)
@@ -294,16 +293,20 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
 	 && __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY) < 0)
 	  goto err;
 
+     p_udesc = (struct udesc*)malloc(sizeof(struct udesc));
+     if (!p_udesc)
+	  goto err;
+
      if (dbuspolicy_init_udesc(kc, bus_type, p_udesc) < 0)
 	  goto err;
 
      return p_udesc;
 
 err:
-     dbuspolicy1_free(p_udesc);
      if (kc && kc->fd != -1)
 	  close(kc->fd);
      free(kc);
+     free(p_udesc);
 
      return NULL;
 }
