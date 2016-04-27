@@ -240,6 +240,9 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      if (r < 0) /* read */
 	  return -1;
 
+     p_udesc->uid = getuid();
+     p_udesc->gid = getgid();
+
      if (getpwuid_r(p_udesc->uid, &pwent, buf, sizeof(buf), &pwd))
 	  return -1;
 
@@ -258,8 +261,6 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      p_udesc->group[len] = 0;
 
      p_udesc->bus_type = bus_type;
-     p_udesc->uid = getuid();
-     p_udesc->gid = getgid();
      p_udesc->conn = kc;
 
      return 0;
