@@ -228,7 +228,6 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      char buf[1024];
      int attr_fd;
      int r;
-     int len;
 
      attr_fd = open("/proc/self/attr/current", O_RDONLY);
      if (attr_fd < 0)
@@ -254,13 +253,8 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      if (!pwd || !gg)
           return -1;
 
-     len = sizeof(p_udesc->user) - 1;
-     strncpy(p_udesc->user, pwd->pw_name, len);
-     p_udesc->group[len] = 0;
-
-     len = sizeof(p_udesc->group) - 1;
-     strncpy(p_udesc->group, gg->gr_name, len);
-     p_udesc->group[len] = 0;
+     snprintf(p_udesc->user, sizeof(p_udesc->user), "%s", pwd->pw_name);
+     snprintf(p_udesc->group, sizeof(p_udesc->group), "%s", gg->gr_name);
 
      p_udesc->bus_type = bus_type;
      p_udesc->conn = kc;
