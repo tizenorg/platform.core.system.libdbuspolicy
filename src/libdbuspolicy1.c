@@ -233,12 +233,14 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      attr_fd = open("/proc/self/attr/current", O_RDONLY);
      if (attr_fd < 0)
 	  return -1;
-     r = read(attr_fd, p_udesc->label, 256);
+     r = read(attr_fd, buf, sizeof(buf));
 
      close(attr_fd);
 
-     if (r < 0) /* read */
+     if (r < 0 || r >= (long int)sizeof(p_udesc->label)) /* read */
 	  return -1;
+
+     snprintf(p_udesc->label, r + 1 /* additional byte for \0 */, "%s", buf);
 
      p_udesc->uid = getuid();
      p_udesc->gid = getgid();
