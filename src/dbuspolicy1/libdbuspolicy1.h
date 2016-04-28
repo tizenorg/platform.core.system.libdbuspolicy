@@ -47,9 +47,9 @@ struct udesc;
 
 /*!
   libdbuspolicy init
-  \param bus_type bus type (SYSTEM or SESSION)
+  \param bus_path path to the kdbus bus (system or session)
  */
-void* dbuspolicy1_init(unsigned int bus_type);
+void* dbuspolicy1_init(const char *bus_path);
 
 /*!
   libdbuspolicy free
