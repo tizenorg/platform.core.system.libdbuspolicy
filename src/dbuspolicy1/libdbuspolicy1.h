@@ -46,13 +46,21 @@ extern "C" {
 struct udesc;
 
 /*!
-  libdbuspolicy init
-  \param bus_type bus type (SYSTEM or SESSION)
+  Initialize libdbuspolicy configuration context
+  \param bus_path path to the kdbus bus (system or session)
+
+  \note This function should be called only on well known kdbus buses
+  - the system bus (/sys/fs/kdbus/0-system/bus) and session bus
+  (/sys/fs/kdbus/getuid()-user/bus).  If any other bus is specified
+  function will not succeed.
+
+  \return On success pointer to configuration context is returned.  On
+  error NULL is returned.
  */
-void* dbuspolicy1_init(unsigned int bus_type);
+void* dbuspolicy1_init(const char *bus_path);
 
 /*!
-  libdbuspolicy free
+  Free libdbuspolicy configuration context
   \param configuration pointer with policy configuration acquired using dbuspolicy1_init
  */
 void dbuspolicy1_free(void* configuration);
