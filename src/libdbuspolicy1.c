@@ -30,12 +30,15 @@
 #include <sys/mman.h>
 #include <pwd.h>
 #include <grp.h>
+#include <limits.h>
 
 #include <dbuspolicy1/libdbuspolicy1.h>
 #include "libdbuspolicy1-private.h"
 #include "internal/internal.h"
 
+#define KDBUS_PATH_PREFIX "/sys/fs/kdbus/"
 #define KDBUS_SYSTEM_BUS_PATH "/sys/fs/kdbus/0-system/bus"
+
 #define KDBUS_POOL_SIZE (16 * 1024UL * 1024UL)
 
 #define ALIGN8(l) (((l) + 7) & ~7)
@@ -90,9 +93,9 @@ struct udesc {
 };
 
 
-static int kdbus_open_system_bus(void)
+static int kdbus_open_bus(const char *path)
 {
-    return  open(KDBUS_SYSTEM_BUS_PATH, O_RDWR|O_NOCTTY|O_LARGEFILE|O_CLOEXEC );
+    return open(path, O_RDWR|O_NOCTTY|O_LARGEFILE|O_CLOEXEC);
 }
 
 static int kdbus_hello(struct kconn *kc, uint64_t hello_flags, uint64_t attach_flags_send, uint64_t attach_flags_recv)
@@ -262,25 +265,61 @@ static int dbuspolicy_init_udesc(struct kconn* kc, unsigned int bus_type, struct
      return 0;
 }
 
+static int bus_path_resolve(const char *bus_path, char *resolved_path, unsigned resolved_path_size, unsigned int *bus_type)
+{
+     char rp[PATH_MAX];
+     char *p;
+     const char user_suffix[] = "-user/bus";
+     int suffix_pos;
+
+     p = realpath(bus_path, rp);
+     if (!p)
+	  return -1;
+
+     if (0 != strncmp(p, KDBUS_PATH_PREFIX, strlen(KDBUS_PATH_PREFIX)))
+	  return -1;
+
+     if (0 == strcmp(p, KDBUS_SYSTEM_BUS_PATH)) {
+	  *bus_type = SYSTEM_BUS;
+     } else {
+	  suffix_pos = strlen(p) - strlen(user_suffix);
+	  if (suffix_pos < 0)
+	       return -1;
+
+	  if (0 != strcmp(p + suffix_pos, user_suffix))
+	       return -1;
+
+	  *bus_type = SESSION_BUS;
+     }
+
+     snprintf(resolved_path, resolved_path_size, "%s", p);
+     return 0;
+}
+
 /**
  * dbuspolicy1_init
  * @config_name: name of the XML configuration file
  *
  * Set the configuration file used by the calling application
  **/
-DBUSPOLICY1_EXPORT void* dbuspolicy1_init(unsigned int bus_type)
+DBUSPOLICY1_EXPORT void* dbuspolicy1_init(const char *bus_path)
 {
      uint64_t hello_flags = 0;
      uint64_t attach_flags_send =  _KDBUS_ATTACH_ANY;
      uint64_t attach_flags_recv =  _KDBUS_ATTACH_ALL;
      struct kconn* kc = NULL;
      struct udesc* p_udesc = NULL;
+     unsigned int bus_type = -1;
+     char resolved_path[PATH_MAX] = { 0 };
+
+     if (bus_path_resolve(bus_path, resolved_path, sizeof(resolved_path), &bus_type) < 0)
+	  goto err;
 
      kc = (struct kconn*) calloc(1, sizeof(struct kconn));
      if (!kc)
 	  goto err;
 
-     if ((kc->fd = kdbus_open_system_bus()) < 0)
+     if ((kc->fd = kdbus_open_bus(resolved_path)) < 0)
 	  goto err;
 
      if (kdbus_hello(kc, hello_flags, attach_flags_send, attach_flags_recv) < 0)
