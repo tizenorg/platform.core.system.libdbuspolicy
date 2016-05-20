@@ -1,7 +1,7 @@
 #include "naive_policy_checker.hpp"
 #include "cynara.hpp"
 #include "tslog.hpp"
-using namespace _ldp_xml_parser;
+using namespace ldp_xml_parser;
 
 DbAdapter& NaivePolicyChecker::generateAdapter() {
 	if (!m_adapter)

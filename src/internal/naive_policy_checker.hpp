@@ -19,7 +19,7 @@
 #include "policy.hpp"
 #include "naive_policy_db.hpp"
 
-namespace  _ldp_xml_parser
+namespace ldp_xml_parser
 {
 	class NaivePolicyChecker : public IPolicyChecker {
 	private:

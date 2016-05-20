@@ -6,7 +6,7 @@
 #include "internal/internal.h"
 #include "internal/policy.hpp"
 
-using namespace _ldp_xml_parser;
+using namespace ldp_xml_parser;
 
 const char* system_path =  "tests/system.conf";
 

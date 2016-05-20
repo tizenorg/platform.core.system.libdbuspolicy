@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include "tslog.hpp"
 
-using namespace _ldp_xml_parser;
+using namespace ldp_xml_parser;
 
 NaivePolicyDb::Policy::PolicyConstIterator::PolicyConstIterator(const std::vector<Item*>& items, int position)
 	: m_items(items), m_index(position) {

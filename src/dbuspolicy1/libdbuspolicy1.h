@@ -79,15 +79,15 @@ void dbuspolicy1_free(void* configuration);
   \param requested_reply (future implementation)
  */
 int dbuspolicy1_check_out(void* configuration,
-        const char        *destination,
-        const char        *sender,
-        const char        *path,
-        const char        *interface,
-        const char        *member,
-        int               message_type,
-        const char        *error_name,
-        int               reply_serial,
-        int               requested_reply);
+						  const char *destination,
+						  const char *sender,
+						  const char *path,
+						  const char *interface,
+						  const char *member,
+						  int         message_type,
+						  const char *error_name,
+						  int         reply_serial,
+						  int         requested_reply);
 
 /*!
   Check policy for incoming message
@@ -106,18 +106,18 @@ int dbuspolicy1_check_out(void* configuration,
   \param requested_reply (future implementation)
  */
 int dbuspolicy1_check_in(void* configuration,
-        const char        *destination,
-        const char        *sender,
-        const char        *sender_label,
-        uid_t             sender_uid,
-        gid_t             sender_gid,
-        const char        *path,
-        const char        *interface,
-        const char        *member,
-        int               message_type,
-        const char        *error_name,
-        int               reply_serial,
-        int               requested_reply);
+						 const char *destination,
+						 const char *sender,
+						 const char *sender_label,
+						 uid_t       sender_uid,
+						 gid_t       sender_gid,
+						 const char *path,
+						 const char *interface,
+						 const char *member,
+						 int         message_type,
+						 const char *error_name,
+						 int         reply_serial,
+						 int         requested_reply);
 
 /*!
   Check policy for service ownership

@@ -20,7 +20,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <string>
 
-namespace  _ldp_xml_parser
+namespace ldp_xml_parser
 {
 	enum MessageType {
 		ANY = 0,

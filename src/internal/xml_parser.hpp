@@ -28,26 +28,26 @@
 #include "tslog.hpp"
 #include "policy.hpp"
 
-namespace _ldp_xml_parser
+namespace ldp_xml_parser
 {
     class XmlParser : boost::noncopyable
     {
         public:
-            ErrCode parse_policy(bool bus,
+            ErrCode parsePolicy(bool bus,
                     std::string const &fname) {
                 ErrCode err = parse(bus, fname);
                 return err;
             }
 
             void registerAdapter(DbAdapter& adapter) {
-			    m_adapter = &adapter;
+			    __adapter = &adapter;
             }
 
         private:
             //IO operation
-            static std::set<std::string> m_parsed;
+            static std::set<std::string> __parsed;
 
-            DbAdapter* m_adapter;
+            DbAdapter* __adapter;
             //Data obtained from XML
 
             ErrCode parse(bool bus, std::string const &filename) {
@@ -69,9 +69,9 @@ namespace _ldp_xml_parser
 				if (tslog::verbose())
 					std::cout << "=== XML PARSING BEGIN === : " << filename << '\n';
 
-                errparam = xml_parse(bus, filename);
+                errparam = parseXml(bus, filename);
 				if (first && errparam.first.get() >= 0 && errparam.second != "")
-					get_included_files(filename, errparam.second, included_files);
+					getIncludedFiles(filename, errparam.second, included_files);
 
 				if (tslog::enabled()) {
 					if (tslog::verbose())
@@ -82,7 +82,7 @@ namespace _ldp_xml_parser
             }
 
             //Get all the .conf files within included subdirectory, POSIX style as boost::filesystem is not header-only
-            void get_included_files(const std::string& filename, const std::string& incldir, std::vector<std::string>& files) {
+            void getIncludedFiles(const std::string& filename, const std::string& incldir, std::vector<std::string>& files) {
 				DIR *dir;
 				struct dirent *ent;
 				std::string fname;
@@ -108,15 +108,15 @@ namespace _ldp_xml_parser
 					std::cout << "could not open directory " << dname << '\n';
             }
 
-            std::pair<ErrCode, std::string> xml_parse(bool bus, const std::string& filename) {
+            std::pair<ErrCode, std::string> parseXml(bool bus, const std::string& filename) {
                 std::pair<ErrCode, std::string> ret;
 
-				if (m_parsed.insert(filename).second)
+				if (__parsed.insert(filename).second)
 					try {
 						boost::property_tree::ptree pt;
 						read_xml(filename, pt);
 						if (!pt.empty()) {
-                            m_adapter->updateDb(bus, pt);
+                            __adapter->updateDb(bus, pt);
 							ret.second = pt.get("busconfig.includedir", "");
 						}
 					} catch(const boost::property_tree::xml_parser::xml_parser_error& ex) {

@@ -20,7 +20,7 @@
 #include <vector>
 #include "policy.hpp"
 
-namespace  _ldp_xml_parser
+namespace ldp_xml_parser
 {
 	class NaivePolicyDb : public IPolicyDb {
 	public:
