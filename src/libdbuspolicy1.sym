@@ -5,6 +5,7 @@ global:
         dbuspolicy1_check_in;
         dbuspolicy1_check_out;
         dbuspolicy1_can_own;
+        dbuspolicy1_change_creds;
 local:
         *;
 };

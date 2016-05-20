@@ -26,19 +26,13 @@ typedef std::ostream& (*t_ManFun)(std::ostream&);
 
 namespace tslog
 {
-	int8_t g_verbosity; // <0 disable 0 brief >0 verbose
 
-	bool get_log_env(char const *name) {
-		char const *ldp_log_mode = getenv(name);
-		return ldp_log_mode && '0' != *ldp_log_mode;
-	}
+	bool get_log_env(char const *name);
 
-	void init() {
-		g_verbosity = get_log_env("LDP_LOG") ? get_log_env("LDP_VERBOSE") : -1;
-	}
+	void init();
 
-	bool enabled() { return g_verbosity >= 0; }
-	bool verbose() { return g_verbosity > 0; }
+	bool enabled();
+	bool verbose();
 }
 
 #endif
