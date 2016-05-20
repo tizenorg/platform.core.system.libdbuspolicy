@@ -31,7 +31,7 @@ enum class TreeType : uint8_t {
 	OWN
 };
 
-namespace _ldp_xml_parser
+namespace ldp_xml_parser
 {
     namespace {
         static const std::string ROOT_FIELD = "busconfig";

@@ -57,48 +57,48 @@ typedef unsigned long dbus_uid_t;
 typedef unsigned long dbus_gid_t;
 
 struct kconn {
-    int fd;
-    uint64_t id;
-    char *pool;
+	int fd;
+	uint64_t id;
+	char *pool;
 } g_conn[2];
 
 struct udesc {
-    char user[256];
-    dbus_uid_t uid;
-    char group[256];
-    dbus_gid_t gid;
-    char label[256];
+	char user[256];
+	dbus_uid_t uid;
+	char group[256];
+	dbus_gid_t gid;
+	char label[256];
 } g_udesc;
 
 static int kdbus_open_bus(const char *path)
 {
-    return open(path, O_RDWR|O_NOCTTY|O_LARGEFILE|O_CLOEXEC);
+	return open(path, O_RDWR|O_NOCTTY|O_LARGEFILE|O_CLOEXEC);
 }
 
 static int kdbus_hello(bool bus_type, uint64_t hello_flags, uint64_t attach_flags_send, uint64_t attach_flags_recv)
 {
-    struct kdbus_cmd_hello cmd;
+	struct kdbus_cmd_hello cmd;
 	int fd = g_conn[bus_type].fd;
 
-    cmd.size = sizeof(cmd);
-    cmd.flags = hello_flags;
-    cmd.attach_flags_send = attach_flags_send;
-    cmd.attach_flags_recv = attach_flags_recv;
-    cmd.pool_size = KDBUS_POOL_SIZE;
+	cmd.size = sizeof(cmd);
+	cmd.flags = hello_flags;
+	cmd.attach_flags_send = attach_flags_send;
+	cmd.attach_flags_recv = attach_flags_recv;
+	cmd.pool_size = KDBUS_POOL_SIZE;
 
-    if (ioctl(fd, KDBUS_CMD_HELLO, &cmd) < 0)
-        return -errno;
+	if (ioctl(fd, KDBUS_CMD_HELLO, &cmd) < 0)
+		return -errno;
 
-    g_conn[bus_type].id = cmd.id;
-    if (MAP_FAILED == (g_conn[bus_type].pool = mmap(NULL, KDBUS_POOL_SIZE, PROT_READ, MAP_SHARED, fd, 0)))
-        return -errno;
+	g_conn[bus_type].id = cmd.id;
+	if (MAP_FAILED == (g_conn[bus_type].pool = mmap(NULL, KDBUS_POOL_SIZE, PROT_READ, MAP_SHARED, fd, 0)))
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static bool kdbus_is_unique_id(const char* name)
 {
-    return ':' == name[0];
+	return ':' == name[0];
 }
 
 static uint64_t kdbus_unique_id(char const *name)
@@ -115,74 +115,74 @@ static uint64_t kdbus_unique_id(char const *name)
 
 static bool dbuspolicy_init_once(void)
 {
-     struct passwd pwent;
-     struct passwd *pwd;
-     struct group grent;
-     struct group *gg;
-     char buf[1024];
-     int attr_fd;
-     int r;
+	struct passwd pwent;
+	struct passwd *pwd;
+	struct group grent;
+	struct group *gg;
+	char buf[1024];
+	int attr_fd;
+	int r;
 
-     attr_fd = open("/proc/self/attr/current", O_RDONLY);
-     if (attr_fd < 0)
-	  return -1;
-     r = read(attr_fd, buf, sizeof(buf));
+	attr_fd = open("/proc/self/attr/current", O_RDONLY);
+	if (attr_fd < 0)
+		return -1;
+	r = read(attr_fd, buf, sizeof(buf));
 
-     close(attr_fd);
+	close(attr_fd);
 
-     if (r < 0 || r >= (long int)sizeof(g_udesc.label)) /* read */
-	  return true;
+	if (r < 0 || r >= (long int)sizeof(g_udesc.label)) /* read */
+		return true;
 
-     g_udesc.uid = getuid();
-     g_udesc.gid = getgid();
+	g_udesc.uid = getuid();
+	g_udesc.gid = getgid();
 
-     snprintf(g_udesc.label, r + 1 /* additional byte for \0 */, "%s", buf);
-     if (getpwuid_r(g_udesc.uid, &pwent, buf, sizeof(buf), &pwd))
-         return true;
+	snprintf(g_udesc.label, r + 1 /* additional byte for \0 */, "%s", buf);
+	if (getpwuid_r(g_udesc.uid, &pwent, buf, sizeof(buf), &pwd))
+		return true;
 
-     if (getgrgid_r(g_udesc.gid, &grent, buf, sizeof(buf), &gg))
-         return true;
+	if (getgrgid_r(g_udesc.gid, &grent, buf, sizeof(buf), &gg))
+		return true;
 
-     if (!pwd || !gg)
-          return false;
+	if (!pwd || !gg)
+		return false;
 
-     snprintf(g_udesc.user, sizeof(g_udesc.user), "%s", pwd->pw_name);
-     snprintf(g_udesc.group, sizeof(g_udesc.group), "%s", gg->gr_name);
+	snprintf(g_udesc.user, sizeof(g_udesc.user), "%s", pwd->pw_name);
+	snprintf(g_udesc.group, sizeof(g_udesc.group), "%s", gg->gr_name);
 
 	__internal_init_once();
 
-     return false;
+	return false;
 }
 
 static int bus_path_resolve(const char *bus_path, char *resolved_path, unsigned resolved_path_size, unsigned int *bus_type)
 {
-     char rp[PATH_MAX];
-     char *p;
-     const char user_suffix[] = "-user/bus";
-     int suffix_pos;
+	char rp[PATH_MAX];
+	char *p;
+	const char user_suffix[] = "-user/bus";
+	int suffix_pos;
 
-     p = realpath(bus_path, rp);
-     if (!p)
-	  return -1;
+	p = realpath(bus_path, rp);
+	if (!p)
+		return -1;
 
-     if (0 != strncmp(p, KDBUS_PATH_PREFIX, strlen(KDBUS_PATH_PREFIX)))
-	  return -1;
+	if (0 != strncmp(p, KDBUS_PATH_PREFIX, strlen(KDBUS_PATH_PREFIX)))
+		return -1;
 
-     if (0 == strcmp(p, KDBUS_SYSTEM_BUS_PATH)) {
-	  *bus_type = SYSTEM_BUS;
-     } else {
-	  suffix_pos = strlen(p) - strlen(user_suffix);
-	  if (suffix_pos < 0)
-	       return -1;
+	if (0 == strcmp(p, KDBUS_SYSTEM_BUS_PATH)) {
+		*bus_type = SYSTEM_BUS;
+	} else {
+		suffix_pos = strlen(p) - strlen(user_suffix);
+		if (suffix_pos < 0)
+			return -1;
 
-	  if (0 != strcmp(p + suffix_pos, user_suffix))
-	       return -1;
+		if (0 != strcmp(p + suffix_pos, user_suffix))
+			return -1;
 
-	  *bus_type = SESSION_BUS;
-     }
+		*bus_type = SESSION_BUS;
+	}
 
-     snprintf(resolved_path, resolved_path_size, "%s", p);
-     return 0;
+	snprintf(resolved_path, resolved_path_size, "%s", p);
+	return 0;
 }
 
 static bool init_once_done = false;
@@ -260,15 +260,15 @@ static bool configuration_bus_type(struct kconn const *configuration) { return c
  * Description.
  **/
 DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
-        const char        *destination,
-        const char        *sender,
-        const char        *path,
-        const char        *interface,
-        const char        *member,
-        int               message_type,
-        const char        *error_name,
-        int               reply_serial,
-        int               requested_reply)
+											 const char *destination,
+											 const char *sender,
+											 const char *path,
+											 const char *interface,
+											 const char *member,
+											 int         message_type,
+											 const char *error_name,
+											 int         reply_serial,
+											 int         requested_reply)
 {
 	char const *label = NULL;
 	const char* k_names[KDBUS_CONN_MAX_NAMES+1];
@@ -332,23 +332,23 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
 		for (item = conn_info->items; (uintptr_t)item < items_end; item = (typeof(item))ALIGN8((uintptr_t)item + (unsigned)item->size))
 			switch ((unsigned)item->type)
 			{
-				case KDBUS_ITEM_CREDS:
-					uid_n = item->creds.euid;
-					gid_n = item->creds.egid;
-					break;
-				case KDBUS_ITEM_SECLABEL:
-					label = item->str;
-					break;
-				case KDBUS_ITEM_OWNED_NAME:
-					empty_names = false;
-					if (r <= 0)
-						k_names[k_i++] = item->name.name;
-					break;
+			case KDBUS_ITEM_CREDS:
+				uid_n = item->creds.euid;
+				gid_n = item->creds.egid;
+				break;
+			case KDBUS_ITEM_SECLABEL:
+				label = item->str;
+				break;
+			case KDBUS_ITEM_OWNED_NAME:
+				empty_names = false;
+				if (r <= 0)
+					k_names[k_i++] = item->name.name;
+				break;
 			}
 	}
 
-    if (empty_names)
-        r = __internal_can_send(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, destination, path, interface, member, message_type);
+	if (empty_names)
+		r = __internal_can_send(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, destination, path, interface, member, message_type);
 	else {
 		k_names[k_i++] = NULL;
         r = __internal_can_send_multi_dest(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, k_names, path, interface, member, message_type);
@@ -364,7 +364,7 @@ end:
 		ioctl(g_conn[bus_type].fd, KDBUS_CMD_FREE, &cmd.cmd_free);
 
 	__internal_exit();
-    return r;
+	return r;
 }
 
 /**
@@ -375,36 +375,36 @@ end:
  * Description.
  **/
 DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
-        const char        *destination,
-        const char        *sender,
-        const char        *sender_label,
-        uid_t             sender_uid,
-        gid_t             sender_gid,
-        const char        *path,
-        const char        *interface,
-        const char        *member,
-        int               message_type,
-        const char        *error_name,
-        int               reply_serial,
-        int               requested_reply)
+											const char *destination,
+											const char *sender,
+											const char *sender_label,
+											uid_t       sender_uid,
+											gid_t       sender_gid,
+											const char *path,
+											const char *interface,
+											const char *member,
+											int         message_type,
+											const char *error_name,
+											int         reply_serial,
+											int         requested_reply)
 {
-    int r;
+	int r;
 	bool bus_type = configuration_bus_type(configuration);
 
 	__internal_enter();
 
-    r = __internal_can_send(bus_type, sender_uid, sender_gid, sender_label, destination, path, interface, member, message_type);
+	r = __internal_can_send(bus_type, sender_uid, sender_gid, sender_label, destination, path, interface, member, message_type);
 	if (r <= 0)
 		goto end;
 
 	if (message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
 		r = __internal_can_recv(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, sender, path, interface, member, message_type);
-        if (r <= 0)
-            goto end;
-    }
+		if (r <= 0)
+			goto end;
+	}
 end:
-    __internal_exit();
-    return r;
+	__internal_exit();
+	return r;
 }
 
 /**
@@ -419,7 +419,7 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_can_own(void* configuration, const char* cons
 	int r;
 	bool bus_type = configuration_bus_type(configuration);
 	__internal_enter();
-    r = __internal_can_own(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, service);
+	r = __internal_can_own(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, service);
 	__internal_exit();
 	return r;
 }

@@ -24,7 +24,7 @@
 
 #include "../libdbuspolicy1-private.h"
 
-static _ldp_xml_parser::NaivePolicyChecker policy_checker;
+static ldp_xml_parser::NaivePolicyChecker policy_checker;
 
 static const char* get_str(const char* const szstr) {
     return (szstr != NULL) ? szstr : "";
@@ -55,9 +55,9 @@ static const char**  get_strv(const char *s, const char** result) {
 
 int __internal_init(bool bus_type, const char* const config_name)
 {
-    _ldp_xml_parser::XmlParser p;
+    ldp_xml_parser::XmlParser p;
 	p.registerAdapter(policy_checker.generateAdapter());
-    auto err = p.parse_policy(bus_type, get_str(config_name));
+    auto err = p.parsePolicy(bus_type, get_str(config_name));
     return err.get();
 }
 
@@ -89,14 +89,14 @@ void __internal_exit()
 }
 
 int __internal_can_send(bool bus_type,
-                            const uid_t user,
-                            const gid_t group,
-                            const char* const label,
-                            const char* const destination,
-                            const char* const path,
-                            const char* const interface,
-                            const char* const member,
-                            int type)
+						const uid_t user,
+						const gid_t group,
+						const char* const label,
+						const char* const destination,
+						const char* const path,
+						const char* const interface,
+						const char* const member,
+						int type)
 {
     const char* names[KDBUS_CONN_MAX_NAMES+1];
     const char** ns = get_strv(destination, names);
@@ -105,20 +105,20 @@ int __internal_can_send(bool bus_type,
 			std::cout << "Destination too long: "<<destination<<std::endl;
 		return false;
 	}
-	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<_ldp_xml_parser::MessageType>(type), _ldp_xml_parser::MessageDirection::SEND);
+	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
 }
 
 int __internal_can_send_multi_dest(bool bus_type,
-                            const uid_t user,
-                            const gid_t group,
-                            const char* const label,
-                            const char** const destination,
-                            const char* const path,
-                            const char* const interface,
-                            const char* const member,
-                            int type)
+						 const uid_t user,
+						 const gid_t group,
+						 const char* const label,
+						 const char** const destination,
+						 const char* const path,
+						 const char* const interface,
+						 const char* const member,
+						 int type)
 {
-	return policy_checker.check(bus_type, user, group, label, destination, interface, member, path, static_cast<_ldp_xml_parser::MessageType>(type), _ldp_xml_parser::MessageDirection::SEND);
+	return policy_checker.check(bus_type, user, group, label, destination, interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
 }
 
 int __internal_can_recv(bool bus_type,
@@ -133,7 +133,7 @@ int __internal_can_recv(bool bus_type,
 {
     const char* names[KDBUS_CONN_MAX_NAMES+1];
     const char** ns = get_strv(sender, names);
-	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<_ldp_xml_parser::MessageType>(type), _ldp_xml_parser::MessageDirection::RECEIVE);
+	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::RECEIVE);
 }
 
 int __internal_can_own(bool bus_type,

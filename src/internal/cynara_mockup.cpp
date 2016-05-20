@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <stdexcept>
 
-using namespace _ldp_cynara;
+using namespace ldp_cynara;
 
 Cynara::Cynara() {
 }

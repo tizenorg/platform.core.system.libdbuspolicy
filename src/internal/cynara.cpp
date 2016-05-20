@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <cstdlib>
 
-using namespace _ldp_cynara;
+using namespace ldp_cynara;
 
 pthread_mutex_t Cynara::__mutex = PTHREAD_MUTEX_INITIALIZER;
 

@@ -23,7 +23,7 @@
 
 #include <pthread.h>
 
-namespace _ldp_cynara {
+namespace ldp_cynara {
 	enum class CynaraResult : uint8_t {
 		ALLOW,
 		DENY,

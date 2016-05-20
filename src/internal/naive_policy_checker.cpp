@@ -1,7 +1,7 @@
 #include "naive_policy_checker.hpp"
 #include "cynara.hpp"
 #include "tslog.hpp"
-using namespace _ldp_xml_parser;
+using namespace ldp_xml_parser;
 
 DbAdapter& NaivePolicyChecker::generateAdapter() {
 	if (!m_adapter)
@@ -61,7 +61,7 @@ bool NaivePolicyChecker::parseDecision(Decision decision,
 		return false;
 	case Decision::CHECK:
 		std::sprintf(uid_str, "%lu", (unsigned long)uid);
-		return _ldp_cynara::Cynara::check(label, privilege, uid_str) == _ldp_cynara::CynaraResult::ALLOW;
+		return ldp_cynara::Cynara::check(label, privilege, uid_str) == ldp_cynara::CynaraResult::ALLOW;
 	}
 
 	return false;

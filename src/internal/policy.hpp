@@ -21,7 +21,7 @@
 #include <string>
 #define MAX_LOG_LINE 1024
 
-namespace  _ldp_xml_parser
+namespace ldp_xml_parser
 {
 	enum class MessageType : uint8_t {
 		ANY = 0,

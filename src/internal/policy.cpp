@@ -6,7 +6,7 @@
 #include <grp.h>
 #include <pwd.h>
 
-using namespace _ldp_xml_parser;
+using namespace ldp_xml_parser;
 
 static const char* message_type[] = { "ANY", "METHOD_CALL", "METHOD_RETURN", "ERROR", "SIGNAL"};
 static const char* message_dir[] = { "ANY", "SEND", "RECEIVE"};
