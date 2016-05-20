@@ -28,8 +28,12 @@ development files.
 cp %{SOURCE1001} .
 
 %build
-%reconfigure --libdir=%{_libdir}	--prefix=/usr
+%reconfigure --libdir=%{_libdir}	--prefix=/usr \
+%if 0%{?test_version}
+--enable-tests
+%endif
 make
+make check
 
 %install
 make DESTDIR=%{buildroot} install

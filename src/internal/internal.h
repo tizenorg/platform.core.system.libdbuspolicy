@@ -21,7 +21,9 @@
 extern "C" {
 #endif
 
-int __internal_init(unsigned int bus_type, const char* const config_name);
+#define KDBUS_CONN_MAX_NAMES 256
+
+int __internal_init(bool bus_type, const char* const config_name);
 void __internal_init_once(void);
 extern pthread_mutex_t g_mutex;
 void __internal_init_flush_logs(void);
@@ -29,30 +31,40 @@ void __internal_enter(void);
 void __internal_exit(void);
 
 int __internal_can_send(bool bus_type,
-                            const char* const user,
-                            const char* const group,
-                            const char* const label,
-                            const char* const destination,
-                            const char* const path,
-                            const char* const interface,
-                            const char* const member,
-                            int type);
+						const uid_t  user,
+						const gid_t  group,
+						const char* const label,
+						const char* const destination,
+						const char* const path,
+						const char* const interface,
+						const char* const member,
+						int type);
+
+int __internal_can_send_multi_dest(bool bus_type,
+								   const uid_t user,
+								   const gid_t group,
+								   const char* const label,
+								   const char** const destination,
+								   const char* const path,
+								   const char* const interface,
+								   const char* const member,
+								   int type);
 
 int __internal_can_recv(bool bus_type,
-                            const char* const user,
-                            const char* const group,
-                            const char* const label,
-                            const char* const sender,
-                            const char* const path,
-                            const char* const interface,
-                            const char* const member,
-                            int type);
+						uid_t user,
+						gid_t group,
+						const char* const label,
+						const char* const sender,
+						const char* const path,
+						const char* const interface,
+						const char* const member,
+						int type);
 
 int __internal_can_own(bool bus_type,
-                            const char* const user,
-                            const char* const group,
-                            const char* const service);
-
+					   uid_t user,
+					   gid_t group,
+					   const char* const label,
+					   const char* const service);
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

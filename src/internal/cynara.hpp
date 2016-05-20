@@ -19,73 +19,31 @@
 
 #include <cynara-client.h>
 #include <cynara-session.h>
+#include <string>
+
+#include <pthread.h>
 
 namespace _ldp_cynara {
+	enum class CynaraResult : uint8_t {
+		ALLOW,
+		DENY,
+		ERROR_CHECK,
+		ERROR_INIT
+	};
     class Cynara {
-        private:
-            cynara* __cynara;
-            std::string __session;
+	private:
+		static pthread_mutex_t __mutex;
+		cynara* __cynara;
+		const char* __session;
+		bool __inited;
+		Cynara();
+		~Cynara();
 
-            Cynara() {
-                int r = cynara_initialize(&__cynara, NULL);
-                if (r != CYNARA_API_SUCCESS)
-                    throw std::runtime_error("Cynara initialization failed");
+		bool init();
+		static Cynara& getInstance();
+	public:
 
-                __session = cynara_session_from_pid(getpid());
-            }
-
-            ~Cynara() {
-                int r = cynara_finish(__cynara);
-                if (r != CYNARA_API_SUCCESS) {
-                    //TODO: reaction
-                }
-            }
-
-            static Cynara& get_instance() {
-                static Cynara __self;
-                return __self;
-            }
-
-        public:
-            static std::string get_session() {
-                Cynara& c = Cynara::get_instance();
-                c.__session = cynara_session_from_pid(getpid());
-                return c.__session;
-            }
-
-            static bool check(std::string label, std::string privilege, std::string uid, std::string session = "") {
-                Cynara& c = Cynara::get_instance();
-                const char* _label="";
-                const char* _session="";
-                const char* _uid="";
-                const char* _privilege="";
-
-                /**
-                workaround. C-str() returns wrong pointer to str
-                when std::string == ""
-                */
-                if (!label.empty())
-                    _label=label.c_str();
-
-                if (session == "")
-                    session =  c.__session;
-                if (!session.empty())
-                    _session=session.c_str();
-
-                if (!privilege.empty())
-                    _privilege=privilege.c_str();
-
-                if (!uid.empty())
-                    _uid=uid.c_str();
-
-                int r = cynara_check (c.__cynara, _label, _session, _uid, _privilege);
-                if (r == CYNARA_API_ACCESS_ALLOWED)
-                    return true;
-                else if (r == CYNARA_API_ACCESS_DENIED)
-                    return false;
-                else
-                    throw std::runtime_error("Cynara check failed");
-            }
+		static CynaraResult check(const char* label, const char* privilege, const char* uid);
     };
 } //namespace
 #endif

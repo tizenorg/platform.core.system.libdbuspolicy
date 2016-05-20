@@ -23,7 +23,10 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <dirent.h>
 #include <libgen.h>
-#include "xml_policy.hpp"
+//#include "xml_policy.hpp"
+#include "libdbuspolicy1-private.hpp"
+#include "tslog.hpp"
+#include "policy.hpp"
 
 namespace _ldp_xml_parser
 {
@@ -36,47 +39,16 @@ namespace _ldp_xml_parser
                 return err;
             }
 
-            ErrCode can_send(bool bus,
-                    const std::string user,
-                    const std::string group,
-                    const std::string label,
-                    const std::string destination,
-                    const std::string path,
-                    const std::string interface,
-                    const std::string member,
-                    const std::string type) {
-                std::vector<std::string> idx_v = { user, group, destination, path, interface, member, type };
-                return m_xml_policy.can_send_to(bus, idx_v, label);
+            void registerAdapter(DbAdapter& adapter) {
+			    m_adapter = &adapter;
             }
-
-            ErrCode can_recv(bool bus,
-                    const std::string user,
-                    const std::string group,
-                    const std::string label,
-                    const std::string sender,
-                    const std::string path,
-                    const std::string interface,
-                    const std::string member,
-                    const std::string type) {
-                std::vector<std::string> idx_v = { user, group, sender, path, interface, member, type };
-                return m_xml_policy.can_recv_from(bus, idx_v, label);
-            }
-
-            ErrCode can_own(bool bus,
-                    const std::string user,
-                    const std::string group,
-                    const std::string service) {
-                std::vector<std::string> idx_v = { user, group, service };
-                return m_xml_policy.can_own_what(bus, idx_v);
-            }
-
 
         private:
             //IO operation
             static std::set<std::string> m_parsed;
 
+            DbAdapter* m_adapter;
             //Data obtained from XML
-            static XmlPolicy m_xml_policy;
 
             ErrCode parse(bool bus, std::string const &filename) {
                 ErrCode err;
@@ -88,10 +60,6 @@ namespace _ldp_xml_parser
                         err = parse(bus, false, x, incl_files);
                         if (err.is_error()) break;
                     }
-
-                if(err.is_ok())
-                    m_xml_policy.print_decision_trees(bus);
-
                 return err;
             }
 
@@ -148,7 +116,7 @@ namespace _ldp_xml_parser
 						boost::property_tree::ptree pt;
 						read_xml(filename, pt);
 						if (!pt.empty()) {
-							m_xml_policy.update(bus, pt);
+                            m_adapter->updateDb(bus, pt);
 							ret.second = pt.get("busconfig.includedir", "");
 						}
 					} catch(const boost::property_tree::xml_parser::xml_parser_error& ex) {

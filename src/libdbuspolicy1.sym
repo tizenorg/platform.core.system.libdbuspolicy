@@ -5,15 +5,12 @@ global:
         dbuspolicy1_check_in;
         dbuspolicy1_check_out;
         dbuspolicy1_can_own;
+        __dbuspolicy1_change_creds;
 local:
         *;
 };
 
-LIBDBUSPOLICY1_3 {
+LIBDBUSPOLICY1_1_TEST {
 global:
-        dbuspolicy1_thing_ref;
-        dbuspolicy1_thing_unref;
-        dbuspolicy1_thing_get_ctx;
-        dbuspolicy1_thing_new_from_string;
-        dbuspolicy1_thing_get_some_list_entry;
-} LIBDBUSPOLICY1_1;
+        __dbuspolicy1_change_creds;
+};
