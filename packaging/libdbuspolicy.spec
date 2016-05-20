@@ -7,6 +7,8 @@ Release:        0
 Source:         %{name}-%{version}.tar.gz
 Source1001:     %{name}.manifest
 BuildRequires:  boost-devel
+BuildRequires:  glib2-devel
+BuildRequires:  dbus-devel
 BuildRequires:  pkgconfig(cynara-client)
 
 
@@ -23,13 +25,23 @@ libdbuspolicy is a helper library for fine-grained userspace
 policy handling (with SMACK support). This package contains
 development files.
 
+%if 0%{?test-version}
+   --enable-tests
+%endif
+
 %prep
 %setup -q
 cp %{SOURCE1001} .
 
 %build
-%reconfigure --libdir=%{_libdir}	--prefix=/usr
+./autogen.sh
+%configure --libdir=%{_libdir}	--prefix=/usr \
+%if 0%{?test_version}
+--enable-tests
+%endif
+
 make
+make check
 
 %install
 make DESTDIR=%{buildroot} install

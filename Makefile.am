@@ -20,9 +20,9 @@ AM_CFLAGS = ${my_CFLAGS} \
 AM_LDFLAGS = \
 	-Wl,--gc-sections \
 	-Wl,--as-needed \
-        $(CYNARA_CFLAGS) \
-$(CYNARA_LIBS)\
-    -pthread
+	$(CYNARA_CFLAGS) \
+	$(CYNARA_LIBS)\
+	-pthread
 
 SED_PROCESS = \
 	$(AM_V_GEN)$(MKDIR_P) $(dir $@) && $(SED) \
@@ -46,7 +46,13 @@ lib_LTLIBRARIES = src/libdbuspolicy1.la
 src_libdbuspolicy1_la_SOURCES =\
 	src/libdbuspolicy1-private.h \
 	src/libdbuspolicy1.c \
-    src/internal/internal.cpp
+	src/internal/internal.cpp \
+	src/internal/naive_policy_checker.cpp \
+	src/internal/naive_policy_db.cpp \
+	src/internal/policy.cpp \
+	src/internal/xml_parser.cpp \
+	src/internal/tslog.cpp \
+	src/internal/cynara.cpp
 
 EXTRA_DIST += src/libdbuspolicy1.sym
 
@@ -61,8 +67,37 @@ pkgconfig_DATA = src/libdbuspolicy1.pc
 EXTRA_DIST += src/libdbuspolicy1.pc.in
 CLEANFILES += src/libdbuspolicy1.pc
 
-TESTS = src/test-libdbuspolicy1
+TESTS = src/test-libdbuspolicy1-ownership \
+	src/test-libdbuspolicy1-signal \
+	src/test-libdbuspolicy1-method
 
-check_PROGRAMS = src/test-libdbuspolicy1
-src_test_libdbuspolicy1_SOURCES = src/test-libdbuspolicy1.c
-src_test_libdbuspolicy1_LDADD = src/libdbuspolicy1.la $(CYNARA_LIBS)
+check_PROGRAMS = src/test-libdbuspolicy1-ownership \
+    src/test-libdbuspolicy1-signal \
+    src/test-libdbuspolicy1-method
+
+src_test_libdbuspolicy1_ownership_SOURCES = src/test-libdbuspolicy1-ownership.cpp
+src_test_libdbuspolicy1_signal_SOURCES = src/test-libdbuspolicy1-signal.cpp
+src_test_libdbuspolicy1_method_SOURCES = src/test-libdbuspolicy1-method.cpp
+
+noinst_LTLIBRARIES = src/libinternal.a
+src_libinternal_a_SOURCES =\
+	src/libdbuspolicy1-private.h \
+	src/internal/internal.cpp \
+	src/libdbuspolicy1.c \
+	src/internal/naive_policy_checker.cpp \
+	src/internal/naive_policy_db.cpp \
+	src/internal/policy.cpp \
+	src/internal/xml_parser.cpp \
+	src/internal/tslog.cpp \
+	src/internal/cynara_mockup.cpp
+
+libinternal_a_LIBADD = $(CYNARA_LIBS)
+
+src_test_libdbuspolicy1_ownership_LDADD = $(CYNARA_LIBS) \
+	src/libinternal.a
+
+src_test_libdbuspolicy1_signal_LDADD = $(CYNARA_LIBS) \
+	src/libinternal.a
+
+src_test_libdbuspolicy1_method_LDADD = $(CYNARA_LIBS) \
+	src/libinternal.a

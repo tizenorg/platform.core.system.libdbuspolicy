@@ -47,6 +47,13 @@ AS_IF([test "x$enable_debug" = "xyes"], [
         AC_DEFINE(ENABLE_DEBUG, [1], [Debug messages.])
 ])
 
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--enable-tests], [Add API function that allows to change credentials during execution]),
+					 [with_tests=yes],
+					 with_tests=no)
+if test "x$with_tests" = "xyes"; then
+   AC_DEFINE(LIBDBUSPOLICY_TESTS_API, 1, [Define if tests are enabled])
+fi
+
 AC_CHECK_FUNCS([ \
 	__secure_getenv \
 	secure_getenv\

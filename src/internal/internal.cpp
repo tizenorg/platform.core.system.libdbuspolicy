@@ -18,40 +18,44 @@
 #include <string>
 #include <dbuspolicy1/libdbuspolicy1.h>
 #include "xml_parser.hpp"
+#include "policy.hpp"
+#include "naive_policy_checker.hpp"
+#include "internal.h"
+
+#include "../libdbuspolicy1-private.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+static _ldp_xml_parser::NaivePolicyChecker checker;
+static _ldp_xml_parser::PolicyChecker& policy_checker = checker;
+
 static const char* get_str(const char* const szstr) {
     return (szstr != NULL) ? szstr : "";
 }
 
-static std::string get_strv(const char *s) {
-	unsigned i = 0;
+static const char**  get_strv(const char *s, const char** result) {
+	int i = 0;
+	unsigned k = 0;
 	if (s) {
-		i = -1;
-		char c;
-		while ((c = s[++i]) && ' ' != c);
+		while (s[i]) {
+			char c;
+			while ((c = s[i++]) && ' ' != c);
+			result[k++] = s;
+		    s += i;
+			i = 0;
+	    }
+        if (k)
+            result[k++] = NULL;
 	}
-	return std::string{s, i};
+	return k == 0 ? NULL : result;
 }
 
-static const char* get_message_type(int type) {
-    const char* sztype;
-    switch(type) {
-        case DBUSPOLICY_MESSAGE_TYPE_METHOD_CALL:   sztype = "method_call";     break;
-        case DBUSPOLICY_MESSAGE_TYPE_METHOD_RETURN: sztype = "method_return";   break;
-        case DBUSPOLICY_MESSAGE_TYPE_ERROR:         sztype = "error";           break;
-        case DBUSPOLICY_MESSAGE_TYPE_SIGNAL:        sztype = "signal";          break;
-        default:                                    sztype = "";                break;
-    }
-    return sztype;
-}
-
-int __internal_init(bool bus_type, const char* const config_name)
+DBUSPOLICY1_EXPORT int __internal_init(bool bus_type, const char* const config_name)
 {
     _ldp_xml_parser::XmlParser p;
+	p.registerAdapter(policy_checker.generateAdapter());
     auto err = p.parse_policy(bus_type, get_str(config_name));
     return err.get();
 }
@@ -84,8 +88,8 @@ void __internal_exit()
 }
 
 int __internal_can_send(bool bus_type,
-                            const char* const user,
-                            const char* const group,
+                            const uid_t user,
+                            const gid_t group,
                             const char* const label,
                             const char* const destination,
                             const char* const path,
@@ -93,14 +97,27 @@ int __internal_can_send(bool bus_type,
                             const char* const member,
                             int type)
 {
-    _ldp_xml_parser::XmlParser p;
-    auto err = p.can_send(bus_type, get_str(user), get_str(group), get_str(label), get_strv(destination), get_str(path), get_str(interface), get_str(member), get_message_type(type));
-    return err.get();
+    const char* names[KDBUS_MATCH_MAX+1];
+    const char** ns = get_strv(destination, names);
+	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<_ldp_xml_parser::MessageType>(type), _ldp_xml_parser::DIRECTION_SEND);
+}
+
+int __internal_can_send2(bool bus_type,
+                            const uid_t user,
+                            const gid_t group,
+                            const char* const label,
+                            const char** const destination,
+                            const char* const path,
+                            const char* const interface,
+                            const char* const member,
+                            int type)
+{
+	return policy_checker.check(bus_type, user, group, label, destination, interface, member, path, static_cast<_ldp_xml_parser::MessageType>(type), _ldp_xml_parser::DIRECTION_SEND);
 }
 
 int __internal_can_recv(bool bus_type,
-                            const char* const user,
-                            const char* const group,
+                            const uid_t user,
+                            const gid_t group,
                             const char* const label,
                             const char* const sender,
                             const char* const path,
@@ -108,19 +125,18 @@ int __internal_can_recv(bool bus_type,
                             const char* const member,
                             int type)
 {
-    _ldp_xml_parser::XmlParser p;
-    auto err = p.can_recv(bus_type, get_str(user), get_str(group), get_str(label), get_strv(sender), get_str(path), get_str(interface), get_str(member), get_message_type(type));
-    return err.get();
+    const char* names[KDBUS_MATCH_MAX+1];
+    const char** ns = get_strv(sender, names);
+	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<_ldp_xml_parser::MessageType>(type), _ldp_xml_parser::DIRECTION_RECEIVE);
 }
 
 int __internal_can_own(bool bus_type,
-                            const char* const user,
-                            const char* const group,
+                            const uid_t user,
+                            const gid_t group,
+                            const char* const label,
                             const char* const service)
 {
-    _ldp_xml_parser::XmlParser p;
-    auto err = p.can_own(bus_type, get_str(user), get_str(group), get_str(service));
-    return err.get();
+	return policy_checker.check(bus_type, user, group, label, service);
 }
 
 #ifdef __cplusplus

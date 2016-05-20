@@ -26,8 +26,8 @@ extern "C" {
 #define SYSTEM_BUS_CONF_FILE_PRIMARY  "/usr/share/dbus-1/system.conf"
 #define SESSION_BUS_CONF_FILE_PRIMARY "/usr/share/dbus-1/session.conf"
 
-#define SYSTEM_BUS_CONF_FILE_SECONDARY  "/etc/dbus-1/system-local.conf"
-#define SESSION_BUS_CONF_FILE_SECONDARY "/etc/dbus-1/session-local.conf"
+#define SYSTEM_BUS_CONF_FILE_SECONDARY  "/etc/dbus-1/system.conf"
+#define SESSION_BUS_CONF_FILE_SECONDARY "/etc/dbus-1/session.conf"
 
 #define SYSTEM_BUS   0
 #define SESSION_BUS  1

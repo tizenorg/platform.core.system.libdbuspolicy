@@ -46,21 +46,6 @@
 #define UID_INVALID ((uid_t) -1)
 #define GID_INVALID ((gid_t) -1)
 
-static char const *foreach_strv_advance(char const *str) {
-	char c;
-	while ((c = *str++))
-		if (' ' == c)
-			return str;
-	return NULL;
-}
-
-/* iterate over STR; iterate once with "" if !STR or !*STR */
-#define FOREACH_STRV_DEFAULT(ITERLVALPTR,STR) for (\
-	ITERLVALPTR = (!STR || !*STR) ? "" : STR;\
-	ITERLVALPTR;\
-	ITERLVALPTR = foreach_strv_advance(ITERLVALPTR)\
-)
-
 /** A process ID */
 typedef unsigned long dbus_pid_t;
 /** A user ID */
@@ -145,21 +130,21 @@ static bool dbuspolicy_init_once(void)
      if (r < 0 || r >= (long int)sizeof(g_udesc.label)) /* read */
 	  return true;
 
+     g_udesc.uid = getuid();
+     g_udesc.gid = getgid();
+
      snprintf(g_udesc.label, r + 1 /* additional byte for \0 */, "%s", buf);
      if (getpwuid_r(g_udesc.uid, &pwent, buf, sizeof(buf), &pwd))
-	  return true;
+         return true;
 
      if (getgrgid_r(g_udesc.gid, &grent, buf, sizeof(buf), &gg))
-	  return true;
+         return true;
 
      if (!pwd || !gg)
-          return -1;
+          return false;
 
      snprintf(g_udesc.user, sizeof(g_udesc.user), "%s", pwd->pw_name);
      snprintf(g_udesc.group, sizeof(g_udesc.group), "%s", gg->gr_name);
-
-     g_udesc.uid = getuid();
-     g_udesc.gid = getgid();
 
 	__internal_init_once();
 
@@ -251,6 +236,15 @@ DBUSPOLICY1_EXPORT void dbuspolicy1_free(void* configuration)
 		close(((typeof(&g_conn[0]))configuration)->fd);
 }
 
+#ifdef LIBDBUSPOLICY_TESTS_API
+DBUSPOLICY1_EXPORT void dbuspolicy1_change_creds(void* configuration, uid_t uid, gid_t gid,const char* label) {
+	g_udesc.uid = uid;
+	g_udesc.gid = gid;
+	if (label)
+		strcpy (g_udesc.label, label);
+}
+#endif
+
 static bool configuration_bus_type(struct kconn const *configuration) { return configuration != g_conn; }
 
 /**
@@ -272,6 +266,8 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
         int               requested_reply)
 {
 	char const *label = NULL;
+	const char* k_names[KDBUS_MATCH_MAX+1];
+	int k_i = 0;
     int r;
 	uid_t uid_n = UID_INVALID;
 	gid_t gid_n = GID_INVALID;
@@ -341,29 +337,27 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_out(void* configuration,
 				case KDBUS_ITEM_OWNED_NAME:
 					empty_names = false;
 					if (r <= 0)
-						r = __internal_can_send(bus_type, g_udesc.user, g_udesc.group, g_udesc.label, item->name.name, path, interface, member, message_type);
+						k_names[k_i++] = item->name.name;
 					break;
 			}
 	}
 
     if (empty_names)
-        r = __internal_can_send(bus_type, g_udesc.user, g_udesc.group, g_udesc.label, destination, path, interface, member, message_type);
+        r = __internal_can_send(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, destination, path, interface, member, message_type);
+	else {
+		k_names[k_i++] = NULL;
+        r = __internal_can_send2(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, k_names, path, interface, member, message_type);
+	}
+	if (r <= 0)
+		goto end;
 
-	if (r > 0 && message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
-		char gid[25], uid[25];
-		char const *ptr;
-		snprintf(uid, sizeof(uid), "%lu", (unsigned long)uid_n);
-		snprintf(gid, sizeof(gid), "%lu", (unsigned long)gid_n);
+	if (message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL)
+		r = __internal_can_recv(bus_type, uid_n, gid_n, label, sender, path, interface, member, message_type);
 
-        FOREACH_STRV_DEFAULT(ptr, sender)
-			if (0 < (r = __internal_can_recv(bus_type, uid, gid, label, ptr, path, interface, member, message_type)))
-				break;
-    }
-
+end:
 	if (free_offset)
 		ioctl(g_conn[bus_type].fd, KDBUS_CMD_FREE, &cmd.cmd_free);
 
-end:
 	__internal_exit();
     return r;
 }
@@ -389,26 +383,22 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_check_in(void* configuration,
         int               reply_serial,
         int               requested_reply)
 {
-	char const *ptr;
     int r;
-    char gid[25], uid[25];
 	bool bus_type = configuration_bus_type(configuration);
-
-    snprintf(uid, sizeof(uid), "%lu", (unsigned long)sender_uid);
-    snprintf(gid, sizeof(gid), "%lu", (unsigned long)sender_gid);
 
 	__internal_enter();
 
-    FOREACH_STRV_DEFAULT(ptr, destination)
-		if (0 < (r = __internal_can_send(bus_type, uid, gid, sender_label, ptr, path, interface, member, message_type)))
-			break;
+    r = __internal_can_send(bus_type, sender_uid, sender_gid, sender_label, destination, path, interface, member, message_type);
+	if (r <= 0)
+		goto end;
 
-	if (r > 0 && message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL)
-        FOREACH_STRV_DEFAULT(ptr, sender)
-			if (0 < (r = __internal_can_recv(bus_type, g_udesc.user, g_udesc.group, g_udesc.label, ptr, path, interface, member, message_type)))
-				break;
-
-	__internal_exit();
+	if (message_type != DBUSPOLICY_MESSAGE_TYPE_SIGNAL) {
+		r = __internal_can_recv(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, sender, path, interface, member, message_type);
+        if (r <= 0)
+            goto end;
+    }
+end:
+    __internal_exit();
     return r;
 }
 
@@ -424,7 +414,7 @@ DBUSPOLICY1_EXPORT int dbuspolicy1_can_own(void* configuration, const char* cons
 	int r;
 	bool bus_type = configuration_bus_type(configuration);
 	__internal_enter();
-    r = __internal_can_own(bus_type, g_udesc.user, g_udesc.group, service);
+    r = __internal_can_own(bus_type, g_udesc.uid, g_udesc.gid, g_udesc.label, service);
 	__internal_exit();
 	return r;
 }
