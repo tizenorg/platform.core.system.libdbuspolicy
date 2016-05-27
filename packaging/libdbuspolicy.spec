@@ -28,11 +28,7 @@ development files.
 cp %{SOURCE1001} .
 
 %build
-./autogen.sh
-./configure \
-    --libdir=%{_libdir}	\
-    --prefix=/usr
-
+%reconfigure --libdir=%{_libdir}	--prefix=/usr
 make
 
 %install
