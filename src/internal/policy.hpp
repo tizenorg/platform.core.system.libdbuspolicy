@@ -186,7 +186,7 @@ namespace ldp_xml_parser
 						  int level = 0);
 	public:
 		DbAdapter(NaivePolicyDb& system, NaivePolicyDb& session);
-		void updateDb(bool bus, boost::property_tree::ptree& xmlTree);
+		void updateDb(bool bus, boost::property_tree::ptree& xmlTree, std::vector<std::string>& incl_dirs);
 		static uid_t convertToUid(const char* user);
 		static gid_t convertToGid(const char* group);
 	};

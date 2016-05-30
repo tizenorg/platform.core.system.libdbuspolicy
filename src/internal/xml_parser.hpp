@@ -23,7 +23,6 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <dirent.h>
 #include <libgen.h>
-//#include "xml_policy.hpp"
 #include "libdbuspolicy1-private.hpp"
 #include "tslog.hpp"
 #include "policy.hpp"
@@ -65,13 +64,14 @@ namespace ldp_xml_parser
 
             ErrCode parse(bool bus, bool first, const std::string& filename, std::vector<std::string>& included_files) {
                 std::pair<ErrCode, std::string> errparam;
-
+				std::vector<std::string> incl_dirs;
 				if (tslog::verbose())
 					std::cout << "=== XML PARSING BEGIN === : " << filename << '\n';
 
-                errparam = parseXml(bus, filename);
-				if (first && errparam.first.get() >= 0 && errparam.second != "")
-					getIncludedFiles(filename, errparam.second, included_files);
+                errparam = parseXml(bus, filename, incl_dirs);
+				for (int i = 0; i < incl_dirs.size(); i++) {
+					getIncludedFiles(filename, incl_dirs[i], included_files);
+				}
 
 				if (tslog::enabled()) {
 					if (tslog::verbose())
@@ -88,7 +88,10 @@ namespace ldp_xml_parser
 				std::string fname;
 				std::copy(filename.begin(), filename.end(), fname.begin());
 				std::string dname = dirname(const_cast<char*>(fname.c_str()));
-				dname += (std::string("/") + incldir);
+				if (incldir[0] != '/')
+					dname += (std::string("/") + incldir);
+				else
+					dname = incldir;
 				files.clear();
 				if((dir = opendir(dname.c_str())) != NULL) {
 					while((ent = readdir(dir)) != NULL) {
@@ -108,7 +111,7 @@ namespace ldp_xml_parser
 					std::cout << "could not open directory " << dname << '\n';
             }
 
-            std::pair<ErrCode, std::string> parseXml(bool bus, const std::string& filename) {
+		std::pair<ErrCode, std::string> parseXml(bool bus, const std::string& filename, std::vector<std::string>& incl_dirs) {
                 std::pair<ErrCode, std::string> ret;
 
 				if (__parsed.insert(filename).second)
@@ -116,8 +119,7 @@ namespace ldp_xml_parser
 						boost::property_tree::ptree pt;
 						read_xml(filename, pt);
 						if (!pt.empty()) {
-                            __adapter->updateDb(bus, pt);
-							ret.second = pt.get("busconfig.includedir", "");
+                            __adapter->updateDb(bus, pt, incl_dirs);
 						}
 					} catch(const boost::property_tree::xml_parser::xml_parser_error& ex) {
 						ret.first = ErrCode::error(ex.what());

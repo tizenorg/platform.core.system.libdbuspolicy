@@ -1,6 +1,5 @@
 #include "policy.hpp"
 #include "naive_policy_db.hpp"
-//#include "tslog.hpp"
 #include <cstdlib>
 #include <sys/types.h>
 #include <grp.h>
@@ -192,7 +191,7 @@ void DbAdapter::xmlTraversal(bool bus,
 	}
 }
 
-void DbAdapter::updateDb(bool bus, boost::property_tree::ptree& xmlTree) {
+void DbAdapter::updateDb(bool bus, boost::property_tree::ptree& xmlTree, std::vector<std::string>& incl_dirs) {
 	const auto& children = xmlTree.get_child("busconfig");
 	PolicyType policy_type;
 	PolicyTypeValue policy_type_value;
@@ -201,6 +200,8 @@ void DbAdapter::updateDb(bool bus, boost::property_tree::ptree& xmlTree) {
 			__tag_state = POLICY;
 			__attr = false;
 			xmlTraversal(bus, x.second, POLICY, policy_type, policy_type_value);
+		} else if (x.first == "includedir") {
+			incl_dirs.push_back(x.second.data());
 		}
 	}
 }

@@ -219,13 +219,17 @@ DBUSPOLICY1_EXPORT void* dbuspolicy1_init(const char *bus_path)
 		goto err_close;
 
 	rp = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_PRIMARY : SESSION_BUS_CONF_FILE_PRIMARY);
-	rs = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY);
-	__internal_init_flush_logs();
-
-	if ((rp & rs) < 0) /* when both negative */
-		goto err_close;
+	if (rp < 0)
+		rs = __internal_init(bus_type, (bus_type == SYSTEM_BUS) ? SYSTEM_BUS_CONF_FILE_SECONDARY : SESSION_BUS_CONF_FILE_SECONDARY);
+	else
+		rs = 1;
 
 	pthread_mutex_unlock(&g_mutex);
+	__internal_init_flush_logs();
+
+	if (rp < 0 && rs < 0) /* when both negative */
+		goto err_close;
+
 	return &g_conn[bus_type];
 
 err_close:
