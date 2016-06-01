@@ -168,7 +168,6 @@ void DbAdapter::xmlTraversal(bool bus,
 			updateDecision(v, policy_type, policy_type_value, t, attr);
 			xmlTraversal(bus, v.second, t, policy_type, policy_type_value, attr, level + 1);
 		}
-
 		if(!pt.empty() && level > 1) {
 			if (bus)
 				__builder.generateItem(__session_db, policy_type, policy_type_value);
@@ -229,8 +228,8 @@ ItemOwn::ItemOwn(const char* name,
 }
 
 ItemOwn::~ItemOwn() {
-	if (__name)
-		delete[] __name;
+	//if (__name)
+	//	delete[] __name;
 }
 
 ItemType ItemOwn::getType() const {
@@ -263,6 +262,13 @@ const char* ItemOwn::toString(char* str) const {
 	return str;
 }
 
+const char* ItemOwn::getName() const {
+	return __name;
+}
+
+bool ItemOwn::isPrefix() const {
+	return __is_prefix;
+}
 
 const DecisionItem& ItemOwn::getDecision() const {
 	return __decision;
@@ -392,16 +398,15 @@ const DecisionItem& ItemSendReceive::getDecision() const {
 }
 
 ItemOwn* ItemBuilder::getOwnItem() {
-	if (!__current_own) {
-		__current_own = new ItemOwn();
-	}
-	return __current_own;
+	__current_item_type = ItemType::OWN;
+	return &__current_own;
 }
 
 ItemSendReceive* ItemBuilder::getSendReceiveItem() {
 	if (!__current_sr) {
 		__current_sr = new ItemSendReceive();
 	}
+	__current_item_type = ItemType::SEND;
 	return __current_sr;
 }
 
@@ -412,8 +417,6 @@ ItemBuilder::~ItemBuilder(){
 	if (__current_sr)
 		delete __current_sr;
 
-	if (__current_own)
-		delete __current_own;
 }
 
 void ItemBuilder::reset() {
@@ -440,9 +443,9 @@ char* ItemBuilder::duplicate(const char* str) {
 }
 
 void ItemBuilder::generateItem(NaivePolicyDb& db, PolicyType& policy_type, PolicyTypeValue& policy_type_value) {
-	if (__current_own) {
-		__current_own->__decision = __decision;
-		db.addItem(policy_type, policy_type_value, __current_own);
+	if (__current_item_type == ItemType::OWN) {
+		__current_own.__decision = __decision;
+		db.addItem(policy_type, policy_type_value, &__current_own);
 	} else if (__current_sr) {
 		__current_sr->__decision = __decision;
 		db.addItem(policy_type, policy_type_value, __current_sr);

@@ -4,11 +4,20 @@
 using namespace ldp_xml_parser;
 
 
-
 NaivePolicyDb::~NaivePolicyDb() {
 
 }
 
+NaivePolicyDb::PolicyOwn::PolicyOwn(){
+
+	treeRootPtr = new struct TreeNode;
+	treeRootPtr->__decisionItem = {Decision::ANY, NULL};
+	treeRootPtr->__nameChar = '\0';
+	treeRootPtr->__is_prefix = false;
+	for(int i = 0; i < MAX_CHILDREN; i++){
+		treeRootPtr->children[i] = NULL;
+	}
+}
 
 void NaivePolicyDb::addItem(const PolicyType policy_type,
 							const PolicyTypeValue policy_type_value,
@@ -21,12 +30,12 @@ void NaivePolicyDb::addItem(const PolicyType policy_type,
 
 	const MessageDirection dir = item->getDirection();
 	if (dir == MessageDirection::SEND)
-		addItem<ItemSendReceive>(m_send_set, policy_type, policy_type_value, item);
+		addItem(m_send_set, policy_type, policy_type_value, item);
 	else if (dir == MessageDirection::RECEIVE)
-		addItem<ItemSendReceive>(m_receive_set, policy_type, policy_type_value, item);
+		addItem(m_receive_set, policy_type, policy_type_value, item);
 	else {
-		addItem<ItemSendReceive>(m_send_set, policy_type, policy_type_value, item);
-		addItem<ItemSendReceive>(m_receive_set, policy_type, policy_type_value, item);
+		addItem(m_send_set, policy_type, policy_type_value, item);
+		addItem(m_receive_set, policy_type, policy_type_value, item);
 	}
 }
 
@@ -39,7 +48,7 @@ void NaivePolicyDb::addItem(const PolicyType policy_type,
 		std::cout<<"Add item: "<< i_str <<std::endl;
 	}
 
-	addItem<ItemOwn>(m_own_set, policy_type, policy_type_value, item);
+	addItem(m_own_set, policy_type, policy_type_value, item);
 }
 
 
@@ -47,20 +56,245 @@ void NaivePolicyDb::addItem(const PolicyType policy_type,
 bool NaivePolicyDb::getPolicy(const ItemType item_type,
 							  const PolicyType policy_type,
 							  const PolicyTypeValue policy_type_value,
-							  const NaivePolicyDb::Policy<ItemOwn>*& policy) const {
-	return this->template getPolicy<ItemOwn>(m_own_set, policy_type, policy_type_value, policy);
+							  const NaivePolicyDb::PolicyOwn*& policy) const {
+	return this->getPolicyOwn(m_own_set, policy_type, policy_type_value, policy);
 }
 
 bool NaivePolicyDb::getPolicy(const ItemType item_type,
 							  const PolicyType policy_type,
 							  const PolicyTypeValue policy_type_value,
-							  const NaivePolicyDb::Policy<ItemSendReceive>*& policy) const {
+							  const NaivePolicyDb::PolicySR*& policy) const {
 	switch (item_type) {
 	case ItemType::SEND:
-		return this->template getPolicy<ItemSendReceive>(m_send_set, policy_type, policy_type_value, policy);
+		return this->getPolicySR(m_send_set, policy_type, policy_type_value, policy);
 	case ItemType::RECEIVE:
-		return this->template getPolicy<ItemSendReceive>(m_receive_set, policy_type, policy_type_value, policy);
+		return this->getPolicySR(m_receive_set, policy_type, policy_type_value, policy);
 	default:
 		return false;
+	}
+}
+
+
+NaivePolicyDb::PolicySR::PolicyConstIterator::PolicyConstIterator(const std::vector< ItemSendReceive* > & items, int position)
+	: m_items(items), m_index(position) {
+}
+
+ItemSendReceive* const& NaivePolicyDb::PolicySR::PolicyConstIterator::operator*() const {
+	return m_items[m_index];
+}
+
+
+typename NaivePolicyDb::PolicySR::PolicyConstIterator& NaivePolicyDb::PolicySR::PolicyConstIterator::operator++() {
+	if (m_index >= 0)
+		--m_index;
+	return *this;
+}
+
+
+bool NaivePolicyDb::PolicySR::PolicyConstIterator::operator!=(const PolicyConstIterator& it) const {
+return m_index != it.m_index;
+}
+
+
+NaivePolicyDb::PolicySR::PolicyIterator::PolicyIterator(std::vector< ItemSendReceive* > & items, int position)
+	: m_items(items), m_index(position) {
+}
+
+
+ItemSendReceive*& NaivePolicyDb::PolicySR::PolicyIterator::operator*() {
+	return m_items[m_index];
+}
+
+
+typename NaivePolicyDb::PolicySR::PolicyIterator& NaivePolicyDb::PolicySR::PolicyIterator::operator++() {
+	if (m_index >= 0)
+		--m_index;
+	return *this;
+}
+
+
+bool NaivePolicyDb::PolicySR::PolicyIterator::operator!=(const PolicyIterator& it) const {
+	return m_index != it.m_index;
+}
+
+
+NaivePolicyDb::PolicySR::PolicyIterator NaivePolicyDb::PolicySR::begin() {
+	int s = m_items.size() - 1;
+	return NaivePolicyDb::PolicySR::PolicyIterator(m_items, s);
+}
+
+
+NaivePolicyDb::PolicySR::PolicyIterator NaivePolicyDb::PolicySR::end() {
+	return NaivePolicyDb::PolicySR::PolicyIterator(m_items, -1);
+}
+
+
+NaivePolicyDb::PolicySR::PolicyConstIterator NaivePolicyDb::PolicySR::begin() const {
+	int s = m_items.size() - 1;
+	return NaivePolicyDb::PolicySR::PolicyConstIterator(m_items, s);
+}
+
+
+NaivePolicyDb::PolicySR::PolicyConstIterator NaivePolicyDb::PolicySR::end() const {
+	return NaivePolicyDb::PolicySR::PolicyConstIterator(m_items, -1);
+}
+
+
+void NaivePolicyDb::PolicySR::addItem(ItemSendReceive* item) {
+	m_items.push_back(item);
+}
+
+
+const struct TreeNode* NaivePolicyDb::PolicyOwn::getTreeRoot() const{
+	assert(treeRootPtr);
+	return treeRootPtr;
+}
+void NaivePolicyDb::PolicyOwn::addItem(ItemOwn* item) {
+
+	const char *name = item->getName();
+	/*TODO move this few layers up*/
+	if(!name){
+		return;
+	}
+
+	struct TreeNode *node = treeRootPtr;
+	assert(node);
+
+	while(name && *name != '\0'){
+
+		for(int j = 0; j < MAX_CHILDREN; j++){
+
+			if(node->children[j] == NULL){
+
+				node->children[j] = new struct TreeNode;
+
+				node->children[j]->__decisionItem = {Decision::ANY, NULL};
+				node->children[j]->__nameChar = *name;
+				node->children[j]->__is_prefix = false;
+				for(int k = 0; k < MAX_CHILDREN; k++){
+					node->children[j]->children[k] = NULL;
+				}
+
+/*TODO: if this happens, dont look for next letters in children, create nodes for each letter instead*/
+				node = node->children[j];
+				break;
+			}
+
+			else if(node->children[j]->__nameChar == *name){
+				node = node->children[j];
+				break;
+			}
+		}
+		name++;
+	}
+	node->__decisionItem = item->getDecision();
+	node->__is_prefix = item->isPrefix();
+}
+
+
+bool NaivePolicyDb::getPolicySR(const NaivePolicyDb::PolicyTypeSetSR& set,
+							  const PolicyType policy_type,
+							  const PolicyTypeValue policy_type_value,
+							  const NaivePolicyDb::PolicySR*& policy) const
+{
+	if (tslog::enabled())
+		std::cout<<"---policy_type =";
+	try {
+		switch (policy_type) {
+		case PolicyType::CONTEXT:
+			if (tslog::enabled())
+				std::cout << "CONTEXT =" << (int)policy_type_value.context << std::endl;
+			policy = &set.context[static_cast<std::size_t>(policy_type_value.context) ];
+			return true;
+		case PolicyType::USER:
+			if (tslog::enabled())
+				std::cout << "USER =" << (int)policy_type_value.user << std::endl;
+			policy = &set.user.at(policy_type_value.user);
+			return true;
+		case PolicyType::GROUP:
+			if (tslog::enabled())
+				std::cout << "GROUP = " << (int)policy_type_value.group << std::endl;
+			policy = &set.group.at(policy_type_value.group);
+			return true;
+		}
+	} catch (std::out_of_range&)
+	{
+		if (tslog::verbose())
+			std::cout << "GetPolicy: Out of Range exception\n";
+	}
+	if (tslog::enabled())
+		std::cout << "NO POLICY\n";
+	return false;
+}
+
+
+void NaivePolicyDb::addItem(NaivePolicyDb::PolicyTypeSetSR& set,
+							const PolicyType policy_type,
+							const PolicyTypeValue policy_type_value,
+							ItemSendReceive* const item) {
+	switch (policy_type) {
+	case PolicyType::CONTEXT:
+		set.context[static_cast<std::size_t>(policy_type_value.context)].addItem(item);
+		break;
+	case PolicyType::USER:
+		set.user[policy_type_value.user].addItem(item);
+		break;
+	case PolicyType::GROUP:
+		set.group[policy_type_value.group].addItem(item);
+		break;
+	}
+}
+
+
+bool NaivePolicyDb::getPolicyOwn(const NaivePolicyDb::PolicyTypeSetOwn& set,
+							  const PolicyType policy_type,
+							  const PolicyTypeValue policy_type_value,
+							  const NaivePolicyDb::PolicyOwn*& policy) const
+{
+	if (tslog::enabled())
+		std::cout<<"---policy_type =";
+	try {
+		switch (policy_type) {
+		case PolicyType::CONTEXT:
+			if (tslog::enabled())
+				std::cout << "CONTEXT =" << (int)policy_type_value.context << std::endl;
+			policy = &set.context[static_cast<std::size_t>(policy_type_value.context) ];
+			return true;
+		case PolicyType::USER:
+			if (tslog::enabled())
+				std::cout << "USER =" << (int)policy_type_value.user << std::endl;
+			policy = &set.user.at(policy_type_value.user);
+			return true;
+		case PolicyType::GROUP:
+			if (tslog::enabled())
+				std::cout << "GROUP = " << (int)policy_type_value.group << std::endl;
+			policy = &set.group.at(policy_type_value.group);
+			return true;
+		}
+	} catch (std::out_of_range&)
+	{
+		if (tslog::verbose())
+			std::cout << "GetPolicy: Out of Range exception\n";
+	}
+	if (tslog::enabled())
+		std::cout << "NO POLICY\n";
+	return false;
+}
+
+
+void NaivePolicyDb::addItem(NaivePolicyDb::PolicyTypeSetOwn& set,
+							const PolicyType policy_type,
+							const PolicyTypeValue policy_type_value,
+							ItemOwn* const item) {
+	switch (policy_type) {
+	case PolicyType::CONTEXT:
+		set.context[static_cast<std::size_t>(policy_type_value.context)].addItem(item);
+		break;
+	case PolicyType::USER:
+		set.user[policy_type_value.user].addItem(item);
+		break;
+	case PolicyType::GROUP:
+		set.group[policy_type_value.group].addItem(item);
+		break;
 	}
 }

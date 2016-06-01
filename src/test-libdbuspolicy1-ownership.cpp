@@ -47,7 +47,7 @@ struct OwnershipTest ownership_tests[]={
 
 void ownershipTest_print(struct OwnershipTest* t, bool result) {
 	printf("uid = %lu, gid = %lu, label = %s, service = %s, expected = %d, result = %d",
-		   (unsigned long)t->user, (unsigned long)t->group, t->label, t->service, !((int)t->expected_result), (int)result);
+		   (unsigned long)t->user, (unsigned long)t->group, t->label, t->service, ((int)t->expected_result), (int)result);
 }
 
 bool ownership_test() {

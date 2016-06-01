@@ -21,9 +21,11 @@
 #include <internal/internal.h>
 #include <string>
 #define MAX_LOG_LINE 1024
+#define MAX_CHILDREN 64
 
 namespace ldp_xml_parser
 {
+
 	enum class MessageType : uint8_t {
 		ANY = 0,
 		METHOD_CALL,
@@ -104,6 +106,15 @@ namespace ldp_xml_parser
 		ItemType getType() const;
 		const char* toString(char* str) const;
 		const DecisionItem& getDecision() const;
+		const char* getName() const;
+		bool isPrefix() const;
+	};
+
+	struct TreeNode{
+		DecisionItem __decisionItem;
+		char __nameChar;
+		bool __is_prefix;
+		struct TreeNode *children[MAX_CHILDREN];
 	};
 
 	struct NameSR {
@@ -158,7 +169,8 @@ namespace ldp_xml_parser
 	class ItemBuilder {
 	private:
 		DecisionItem __decision;
-		ItemOwn* __current_own;
+		ItemOwn __current_own;
+		ItemType __current_item_type;
 		ItemSendReceive* __current_sr;
 		ItemOwn* getOwnItem();
 		ItemSendReceive* getSendReceiveItem();
