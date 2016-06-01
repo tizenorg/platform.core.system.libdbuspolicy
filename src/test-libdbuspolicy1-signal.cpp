@@ -15,7 +15,10 @@ struct SignalTest {
 	const char* dest;
 	const char* interface;
 };
-
+/**
+ * This test set tests ability to parse xml db
+ * and check signal call allowance in many use cases
+ */
 struct SignalTest signal_tests[]={
 	(struct SignalTest){true,  0,    0, "test", "bli.bla.blubb test.test1 test.tes3", "/an/object/path"},
 	(struct SignalTest){false,  5010, 0, "test", "bli.bla.blubb", "/an/object/path"},

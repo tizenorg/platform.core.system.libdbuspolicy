@@ -14,7 +14,11 @@ struct OwnershipTest {
 	const char* label;
 	const char* service;
 };
-
+/**
+ * This test set tests ability to parse xml db
+ * and check ownership privilege in many use cases
+ * including prefix feature
+ */
 struct OwnershipTest ownership_tests[]={
 	(struct OwnershipTest){true,  0,    0, "test", "org.test.test1"},
 	(struct OwnershipTest){true,  5009, 0, "test", "org.test.test1"},
