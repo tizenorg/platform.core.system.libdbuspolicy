@@ -18,11 +18,23 @@
 
 #include <boost/tokenizer.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <internal/internal.h>
 #include <string>
 #define MAX_LOG_LINE 1024
+#define MAX_CHILDREN 65
 
 namespace ldp_xml_parser
 {
+
+	const char char_map[128] {65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+				65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+				65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 10, 12, 65,
+				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 65, 65, 65, 65, 65, 65,
+				65, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+				54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 65, 65, 65, 11,
+				65, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+				28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 65, 65, 65, 65, 65};
+
 	enum class MessageType : uint8_t {
 		ANY = 0,
 		METHOD_CALL,
@@ -37,7 +49,7 @@ namespace ldp_xml_parser
 		RECEIVE
 	};
 
-	enum class ItemType : uint8_t{
+	enum class ItemType : uint8_t {
 		GENERIC,
 		OWN,
 		SEND,
@@ -74,41 +86,70 @@ namespace ldp_xml_parser
 
 	class ItemBuilder;
 
-	class Item {
-	protected:
-		Decision _decision;
-		const char* _privilege;
-		bool _is_owner;
+	class DecisionItem {
+	private:
+		Decision __decision;
+		const char* __privilege;
 	public:
 		friend class ItemBuilder;
-		Item(Decision decision = Decision::ANY, const char* privilege = NULL, bool isOwner = false);
-		virtual ~Item();
-		virtual bool match(const Item& item) const;
-		virtual bool match(const Item* item) const;
-		virtual Decision getDecision() const;
-		virtual const char*  getPrivilege() const;
-		virtual ItemType getType() const;
-		virtual const char* toString(char* str) const;
+		DecisionItem(Decision decision = Decision::ANY, const char* privilege = NULL);
+		~DecisionItem();
+		Decision getDecision() const;
+		const char*  getPrivilege() const;
+		ItemType getType() const;
+		const char* toString(char* str) const;
 	};
 
-	class ItemOwn : public Item {
+	class ItemOwn {
 	private:
+		DecisionItem __decision;
 		const char* __name;
 		bool __is_prefix;
 	public:
 		friend class ItemBuilder;
 		ItemOwn(const char* name = NULL,
-				bool is_prefix = false,
 				Decision decision = Decision::ANY,
 				const char* privilege = NULL);
-		virtual ~ItemOwn();
-		virtual bool match(const Item* item) const;
-		virtual ItemType getType() const;
-		virtual const char* toString(char* str) const;
+		bool match(const char* const name) const;
+		ItemType getType() const;
+		const char* toString(char* str) const;
+		const DecisionItem& getDecision() const;
+		const char* getName() const;
+		bool isPrefix() const;
 	};
 
-	class ItemSendReceive : public Item {
-		const char** __names;
+	struct TreeNode{
+		DecisionItem __decisionItem;
+		char __nameChar;
+		bool __is_prefix;
+		struct TreeNode *children[MAX_CHILDREN];
+	};
+
+	struct NameSR {
+		const char* name;
+		int len;
+		NameSR(const char* m = NULL, int l = 0);
+	};
+
+	struct MatchItemSR {
+		int names_num;
+	    NameSR names[KDBUS_CONN_MAX_NAMES+1];
+		const char* interface;
+		const char* member;
+		const char* path;
+		MessageType type;
+		MessageDirection direction;
+		MatchItemSR(const char* i = NULL, const char* me = NULL, const char* p = NULL, MessageType t = MessageType::ANY, MessageDirection d = MessageDirection::ANY);
+		~MatchItemSR();
+		void addName(const char* name);
+		bool addNames(const char* name);
+		const char* toString(char* str) const;
+	};
+
+	class ItemSendReceive {
+	private:
+		DecisionItem __decision;
+		NameSR  __name;
 		const char* __interface;
 		const char* __member;
 		const char* __path;
@@ -116,7 +157,7 @@ namespace ldp_xml_parser
 		MessageDirection __direction;
 	public:
 		friend class ItemBuilder;
-		ItemSendReceive(const char** names = NULL,
+		ItemSendReceive(const char* name = NULL,
 						const char* interface = NULL,
 						const char* member = NULL,
 						const char* path = NULL,
@@ -124,26 +165,28 @@ namespace ldp_xml_parser
 						MessageDirection direction = MessageDirection::ANY,
 						Decision decision = Decision::ANY,
 						const char* privilege = NULL);
-		virtual ~ItemSendReceive();
-		virtual bool match(const Item* item) const;
+		~ItemSendReceive();
+		bool match(const MatchItemSR& item) const;
 		MessageDirection getDirection() const;
-		virtual ItemType getType() const;
-		virtual const char* toString(char* str) const;
+		ItemType getType() const;
+		const char* toString(char* str) const;
+		const DecisionItem& getDecision() const;
 	};
 
+	class NaivePolicyDb;
 	class ItemBuilder {
 	private:
-		Item* __current;
-		Decision __delayed_decision;
-		const char* __delayed_privilege;
+		DecisionItem __decision;
+		ItemOwn __current_own;
+		ItemType __current_item_type;
+		ItemSendReceive* __current_sr;
 		ItemOwn* getOwnItem();
 		ItemSendReceive* getSendReceiveItem();
 		char* duplicate(const char* str);
-		void prepareItem();
 	public:
 		ItemBuilder();
 		~ItemBuilder();
-		Item* generateItem();
+		void generateItem(NaivePolicyDb& db, PolicyType& policy_type, PolicyTypeValue& policy_type_value);
 		void reset();
 		void addUser(const char* name);
 		void addGroup(const char* name);
@@ -159,7 +202,6 @@ namespace ldp_xml_parser
 		void setPrefix(bool value);
 	};
 
-	class NaivePolicyDb;
 	class DbAdapter {
 	private:
 		enum state {

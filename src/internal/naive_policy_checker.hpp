@@ -18,6 +18,8 @@
 
 #include "policy.hpp"
 #include "naive_policy_db.hpp"
+#include "cynara.hpp"
+#include "tslog.hpp"
 
 namespace ldp_xml_parser
 {
@@ -26,36 +28,48 @@ namespace ldp_xml_parser
 		NaivePolicyDb m_bus_db[2];
 		DbAdapter* m_adapter;
 		NaivePolicyDb& getPolicyDb(bool type);
-		Decision checkPolicy(const NaivePolicyDb::Policy& policy,
-							 const Item& item,
+
+		Decision checkPolicySR(const NaivePolicyDb::PolicySR& policy,
+							 const MatchItemSR& item,
 							 const char*& privilege);
+
+		Decision checkPolicyOwn(const NaivePolicyDb::PolicyOwn& policy,
+							 const ItemOwn& item,
+							 const char*& privilege);
+
+
 		bool parseDecision(Decision decision,
 						   uid_t uid,
 						   const char* label,
 						   const char* privilege);
-		bool checkItem(bool bus_type,
+
+		bool checkItemSR(bool bus_type,
 					   uid_t uid,
 					   gid_t gid,
 					   const char* label,
-					   const Item& item);
+					   const MatchItemSR& item,
+					   const ItemType type);
+
+		bool checkItemOwn(bool bus_type,
+					   uid_t uid,
+					   gid_t gid,
+					   const char* label,
+					   const ItemOwn& item,
+					   const ItemType type);
 	public:
 		~NaivePolicyChecker();
 		DbAdapter& generateAdapter();
 		bool check(bool bus_type,
-						   uid_t uid,
-						   gid_t gid,
-						   const char* const label,
-						   const char* const name);
+				   uid_t uid,
+				   gid_t gid,
+				   const char* const label,
+				   const char* const name);
 		bool check(bool bus_type,
-						   uid_t uid,
-						   gid_t gid,
-						   const char* const label,
-						   const char** const names,
-						   const char* const interface,
-						   const char* const member,
-						   const char* const path,
-						   MessageType message_type,
-						   MessageDirection message_dir);
+				   uid_t uid,
+				   gid_t gid,
+				   const char* const label,
+				   MatchItemSR& matcher,
+				   ItemType type);
 	};
 }
 #endif

@@ -19,33 +19,37 @@
 #include <map>
 #include <vector>
 #include "policy.hpp"
+#include <cstdlib>
+#include "tslog.hpp"
 
 namespace ldp_xml_parser
 {
 	class NaivePolicyDb {
 	public:
-		class Policy {
+
+
+		class PolicySR {
 		private:
-			std::vector<Item*> m_items;
+			std::vector<ItemSendReceive*> m_items;
 		public:
 			class PolicyConstIterator {
 			private:
-				const std::vector<Item*>& m_items;
+				const std::vector<ItemSendReceive*>& m_items;
 				int m_index;
 			public:
-				PolicyConstIterator(const std::vector<Item*>& items, int position);
-				Item* const& operator*() const;
+				PolicyConstIterator(const std::vector<ItemSendReceive*>& items, int position);
+				ItemSendReceive* const& operator*() const;
 				PolicyConstIterator& operator++();
 				bool operator!=(const PolicyConstIterator& it) const;
 			};
 
 			class PolicyIterator {
 			private:
-				std::vector<Item*>& m_items;
+				std::vector<ItemSendReceive*>& m_items;
 				int m_index;
 			public:
-				PolicyIterator(std::vector<Item*>& items, int position);
-				Item*& operator*();
+				PolicyIterator(std::vector<ItemSendReceive*>& items, int position);
+				ItemSendReceive*& operator*();
 				PolicyIterator& operator++();
 				bool operator!=(const PolicyIterator& it) const;
 			};
@@ -54,33 +58,82 @@ namespace ldp_xml_parser
 			PolicyIterator end();
 			PolicyConstIterator begin() const;
 			PolicyConstIterator end() const;
-			void addItem(Item* item);
+			void addItem(ItemSendReceive* item);
+		};
+
+
+		class PolicyOwn {
+			private:
+				struct TreeNode *treeRootPtr = NULL;
+				void nodeRemove(TreeNode **node);
+			public:
+				PolicyOwn();
+				~PolicyOwn();
+				void addItem(ItemOwn* item);
+				const TreeNode* getTreeRoot() const;
+
 		};
 
 		~NaivePolicyDb();
 
-		const Policy* getPolicy(const ItemType item_type,
-								const PolicyType policy_type,
-								const PolicyTypeValue policy_type_value);
+		bool getPolicy(const ItemType item_type,
+					   const PolicyType policy_type,
+					   const PolicyTypeValue policy_type_value,
+					   const PolicyOwn*& policy) const;
+
+		bool getPolicy(const ItemType item_type,
+					   const PolicyType policy_type,
+					   const PolicyTypeValue policy_type_value,
+					   const PolicySR*& policy) const;
 
 		void addItem(const PolicyType policy_type,
 					 const PolicyTypeValue policy_type_value,
-					 Item* const item);
+					 ItemOwn* const item);
+
+		void addItem(const PolicyType policy_type,
+					 const PolicyTypeValue policy_type_value,
+					 ItemSendReceive* const item);
+
 	private:
-		struct PolicyTypeSet {
-			Policy context[static_cast<std::size_t>(ContextType::MAX)];
-			std::map<uid_t, Policy> user;
-			std::map<gid_t, Policy> group;
+
+		struct PolicyTypeSetOwn {
+			PolicyOwn context[static_cast<std::size_t>(ContextType::MAX)];
+			std::map<uid_t, PolicyOwn > user;
+			std::map<gid_t, PolicyOwn > group;
 		};
 
-		PolicyTypeSet m_own_set;
-		PolicyTypeSet m_send_set;
-		PolicyTypeSet m_receive_set;
-		void addItem(PolicyTypeSet& set,
-							 const PolicyType policy_type,
-							 const PolicyTypeValue policy_type_value,
-							 Item* const item);
-	};
-}
+		struct PolicyTypeSetSR {
+			PolicySR context[static_cast<std::size_t>(ContextType::MAX)];
+			std::map<uid_t, PolicySR > user;
+			std::map<gid_t, PolicySR > group;
+		};
 
+		PolicyTypeSetOwn m_own_set;
+		PolicyTypeSetSR m_send_set;
+		PolicyTypeSetSR m_receive_set;
+
+		void addItem(PolicyTypeSetSR& set,
+					 const PolicyType policy_type,
+					 const PolicyTypeValue policy_type_value,
+					 ItemSendReceive* const item);
+
+		bool getPolicySR(const PolicyTypeSetSR& set,
+					   const PolicyType policy_type,
+					   const PolicyTypeValue policy_type_value,
+					   const PolicySR*& policy) const;
+
+		void addItem(PolicyTypeSetOwn& set,
+					 const PolicyType policy_type,
+					 const PolicyTypeValue policy_type_value,
+					 ItemOwn* const item);
+
+		bool getPolicyOwn(const PolicyTypeSetOwn& set,
+					   const PolicyType policy_type,
+					   const PolicyTypeValue policy_type_value,
+					   const PolicyOwn*& policy) const;
+
+	};
+
+
+}
 #endif
