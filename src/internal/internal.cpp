@@ -27,38 +27,15 @@
 static ldp_xml_parser::NaivePolicyChecker policy_checker;
 
 static const char* get_str(const char* const szstr) {
-    return (szstr != NULL) ? szstr : "";
-}
-
-static const char**  get_strv(const char *s, const char** result) {
-	int i = 0;
-	unsigned k = 0;
-	if (s) {
-		while (s[i] && k < KDBUS_CONN_MAX_NAMES + 1) {
-			char c;
-			while ((c = s[i++]) && ' ' != c);
-			result[k++] = s;
-		    s += i;
-			i = 0;
-	    }
-		if (k >= KDBUS_CONN_MAX_NAMES + 1)
-			return NULL;
-        if (k)
-            result[k++] = NULL;
-	}
-	if (!k) {
-		result[0] = "";
-		result[1] = NULL;
-	}
-	return result;
+	return (szstr != NULL) ? szstr : "";
 }
 
 int __internal_init(bool bus_type, const char* const config_name)
 {
-    ldp_xml_parser::XmlParser p;
+	ldp_xml_parser::XmlParser p;
 	p.registerAdapter(policy_checker.generateAdapter());
-    auto err = p.parsePolicy(bus_type, get_str(config_name));
-    return err.get();
+	auto err = p.parsePolicy(bus_type, get_str(config_name));
+	return err.get();
 }
 
 pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -98,49 +75,58 @@ int __internal_can_send(bool bus_type,
 						const char* const member,
 						int type)
 {
-    const char* names[KDBUS_CONN_MAX_NAMES+1];
-    const char** ns = get_strv(destination, names);
-	if (!ns) {
+	ldp_xml_parser::MatchItemSR matcher (interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
+	if (!matcher.addNames(destination)) {
 		if (tslog::verbose())
 			std::cout << "Destination too long: "<<destination<<std::endl;
 		return false;
 	}
-	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
+	return policy_checker.check(bus_type, user, group, label, matcher, ldp_xml_parser::ItemType::SEND);
 }
 
 int __internal_can_send_multi_dest(bool bus_type,
-						 const uid_t user,
-						 const gid_t group,
-						 const char* const label,
-						 const char** const destination,
-						 const char* const path,
-						 const char* const interface,
-						 const char* const member,
-						 int type)
+								   const uid_t user,
+								   const gid_t group,
+								   const char* const label,
+								   const char** const destination,
+								   const char* const path,
+								   const char* const interface,
+								   const char* const member,
+								   int type)
 {
-	return policy_checker.check(bus_type, user, group, label, destination, interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
+	int i = 0;
+	ldp_xml_parser::MatchItemSR matcher (interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
+	if (destination)
+		while (destination[i++]) {
+			matcher.addName(destination[i]);
+		}
+	return policy_checker.check(bus_type, user, group, label, matcher, ldp_xml_parser::ItemType::SEND);
 }
 
 int __internal_can_recv(bool bus_type,
-                            const uid_t user,
-                            const gid_t group,
-                            const char* const label,
-                            const char* const sender,
-                            const char* const path,
-                            const char* const interface,
-                            const char* const member,
-                            int type)
+						const uid_t user,
+						const gid_t group,
+						const char* const label,
+						const char* const sender,
+						const char* const path,
+						const char* const interface,
+						const char* const member,
+						int type)
 {
-    const char* names[KDBUS_CONN_MAX_NAMES+1];
-    const char** ns = get_strv(sender, names);
-	return policy_checker.check(bus_type, user, group, label, ns, interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::RECEIVE);
+	ldp_xml_parser::MatchItemSR matcher (interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::RECEIVE);
+	if (!matcher.addNames(sender)) {
+		if (tslog::verbose())
+			std::cout << "Sender too long: "<<sender<<std::endl;
+		return false;
+	}
+	return policy_checker.check(bus_type, user, group, label, matcher, ldp_xml_parser::ItemType::RECEIVE);
 }
 
 int __internal_can_own(bool bus_type,
-                            const uid_t user,
-                            const gid_t group,
-                            const char* const label,
-                            const char* const service)
+					   const uid_t user,
+					   const gid_t group,
+					   const char* const label,
+					   const char* const service)
 {
 	return policy_checker.check(bus_type, user, group, label, service);
 }

@@ -1,7 +1,7 @@
 #include "naive_policy_checker.hpp"
-#include "cynara.hpp"
-#include "tslog.hpp"
 using namespace ldp_xml_parser;
+
+
 
 DbAdapter& NaivePolicyChecker::generateAdapter() {
 	if (!m_adapter)
@@ -10,34 +10,7 @@ DbAdapter& NaivePolicyChecker::generateAdapter() {
 	return *m_adapter;
 }
 
-Decision NaivePolicyChecker::checkPolicy(const NaivePolicyDb::Policy& policy,
-										 const Item& item,
-										 const char*& privilege)
-{
-	if (tslog::verbose()) {
-		char tmp[MAX_LOG_LINE];
-		const char* i_str = item.toString(tmp);
-		std::cout << "checkpolicy for: " << i_str <<std::endl;
-	}
-	for (auto i : policy) {
-		if (tslog::verbose()) {
-			char tmp[MAX_LOG_LINE];
-			const char* i_str = i->toString(tmp);
-			std::cout << "-readed: " << i_str <<std::endl;
-		}
-		if (i->match(&item)) {
-			if (tslog::verbose()) {
-				char tmp[MAX_LOG_LINE];
-				const char* i_str = i->toString(tmp);
-				std::cout << "-matched: " << i_str <<std::endl;
-			}
-			privilege = i->getPrivilege();
-			return i->getDecision();
-		}
-	}
 
-	return Decision::ANY;
-}
 
 NaivePolicyDb& NaivePolicyChecker::getPolicyDb(bool type) {
 	return m_bus_db[type];
@@ -71,74 +44,176 @@ NaivePolicyChecker::~NaivePolicyChecker() {
 	delete m_adapter;
 }
 
-bool NaivePolicyChecker::checkItem(bool bus_type, uid_t uid, gid_t gid, const char* label, const Item& item) {
-	NaivePolicyDb& policy_db = getPolicyDb(bus_type);
-	ItemType type = item.getType();
-	Decision ret = Decision::ANY;
-	const char* privilege;
-	const NaivePolicyDb::Policy* curr_policy = NULL;
 
-	if (ret == Decision::ANY) {
-		curr_policy = policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::MANDATORY));
-		if (curr_policy)
-			ret = checkPolicy(*curr_policy, item, privilege);
-	}
-
-	if (ret == Decision::ANY) {
-		curr_policy = policy_db.getPolicy(type, PolicyType::USER, PolicyTypeValue(uid));
-		if (curr_policy)
-			ret = checkPolicy(*curr_policy, item, privilege);
-	}
-
-	if (ret == Decision::ANY) {
-		curr_policy = policy_db.getPolicy(type, PolicyType::GROUP, PolicyTypeValue(gid));
-		if (curr_policy)
-			ret = checkPolicy(*curr_policy, item, privilege);
-	}
-
-	if (ret == Decision::ANY) {
-		curr_policy = policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::DEFAULT));
-		if (curr_policy)
-			ret = checkPolicy(*curr_policy, item, privilege);
-	}
-
-	if (ret != Decision::ANY)
-		return parseDecision(ret, uid, label, privilege);
-	else
-		return false;
-}
 
 bool NaivePolicyChecker::check(bool bus_type,
 							   uid_t uid,
 							   gid_t gid,
 							   const char* const label,
 							   const char* const name) {
-	try {
-		ItemOwn item = ItemOwn(name);
-		return checkItem(bus_type, uid, gid, label, item);
-	} catch (std::runtime_error& err) {
-		if (tslog::enabled())
-			std::cout << err.what() << std::endl;
-	}
-	return false;
+	return this->checkItemOwn(bus_type, uid, gid, label, name, ItemType::OWN);
 }
 
 bool NaivePolicyChecker::check(bool bus_type,
 							   uid_t uid,
 							   gid_t gid,
 							   const char* const label,
-							   const char** const names,
-							   const char* const interface,
-							   const char* const member,
-							   const char* const path,
-							   MessageType message_type,
-							   MessageDirection message_dir) {
-	try {
-		ItemSendReceive item = ItemSendReceive(names, interface, member, path, message_type, message_dir);
-		return checkItem(bus_type, uid, gid, label, item);
-	} catch (std::runtime_error& err) {
-		if (tslog::enabled())
-			std::cout << err.what() << std::endl;
+							   MatchItemSR& matcher,
+							   ItemType type) {
+	return this->checkItemSR(bus_type, uid, gid, label, matcher, type);
+}
+
+Decision NaivePolicyChecker::checkPolicySR(const NaivePolicyDb::PolicySR& policy,
+										 const MatchItemSR& item,
+										 const char*& privilege)
+{
+	if (tslog::verbose()) {
+		__log_item(item);
 	}
-	return false;
+
+	for (auto i : policy) {
+		if (tslog::verbose()) {
+			char tmp[MAX_LOG_LINE];
+			const char* i_str = i->getDecision().toString(tmp);
+			std::cout << "-readed: " << i_str;
+			i_str = i->toString(tmp);
+			std::cout << " " << i_str <<std::endl;
+		}
+		if (i->match(item)) {
+			if (tslog::verbose()) {
+				char tmp[MAX_LOG_LINE];
+				const char* i_str = i->getDecision().toString(tmp);
+				std::cout << "-matched: " << i_str;
+				const char* i_str2 = i->toString(tmp);
+				std::cout << " " << i_str2 <<std::endl;
+			}
+			privilege = i->getDecision().getPrivilege();
+			return i->getDecision().getDecision();
+		}
+	}
+
+	return Decision::ANY;
+}
+
+Decision NaivePolicyChecker::checkPolicyOwn(const NaivePolicyDb::PolicyOwn& policy, const ItemOwn& item, const char*& privilege) {
+
+	const char *name = item.getName();
+	const struct TreeNode *node = policy.getTreeRoot();
+	int childIndex = 0;
+	assert(node);
+	Decision ret = Decision::ANY;
+
+	while((name != NULL)&& (*name != '\0')){
+
+
+		childIndex = char_map[*name];
+		if(childIndex > 64){
+			/*name contains forbidden char*/
+			privilege = NULL;
+			return Decision::DENY;
+		}
+		/*Current node is prefix, remeber decision*/
+		if(node->__is_prefix){
+			ret = node->__decisionItem.getDecision();;
+			privilege = node->__decisionItem.getPrivilege();
+		}
+
+		/*Node for this letter dont exist*/
+		if(node->children[childIndex] == NULL){
+			goto out;
+		}
+		else{/*if it exists check for next letter in its child*/
+			node = node->children[childIndex];
+		}
+
+		name++;
+
+	}
+out:
+	if(ret == Decision::ANY){
+		privilege = node->__decisionItem.getPrivilege();
+		return node->__decisionItem.getDecision();
+	}
+	else
+
+		return ret;
+
+}
+
+
+
+
+bool NaivePolicyChecker::checkItemOwn(bool bus_type, uid_t uid, gid_t gid, const char* label, const ItemOwn& item, const ItemType type) {
+
+	NaivePolicyDb& policy_db = getPolicyDb(bus_type);
+	Decision ret = Decision::ANY;
+	const char* privilege;
+	const NaivePolicyDb::PolicyOwn* curr_policy = NULL;
+	if (ret == Decision::ANY) {
+
+		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::MANDATORY), curr_policy))
+
+			ret = checkPolicyOwn(*curr_policy, item, privilege);
+	}
+
+	if (ret == Decision::ANY) {
+
+		if (policy_db.getPolicy(type, PolicyType::USER, PolicyTypeValue(uid), curr_policy))
+
+			ret = checkPolicyOwn(*curr_policy, item, privilege);
+	}
+
+	if (ret == Decision::ANY) {
+
+		if (policy_db.getPolicy(type, PolicyType::GROUP, PolicyTypeValue(gid), curr_policy))
+
+			ret = checkPolicyOwn(*curr_policy, item, privilege);
+	}
+
+	if (ret == Decision::ANY) {
+
+		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::DEFAULT), curr_policy))
+
+			ret = checkPolicyOwn(*curr_policy, item, privilege);
+	}
+	if (ret != Decision::ANY){
+
+		return parseDecision(ret, uid, label, privilege);
+	}
+	else{
+		return false;
+	}
+}
+
+
+bool NaivePolicyChecker::checkItemSR(bool bus_type, uid_t uid, gid_t gid, const char* label, const MatchItemSR& item, const ItemType type) {
+	NaivePolicyDb& policy_db = getPolicyDb(bus_type);
+	Decision ret = Decision::ANY;
+	const char* privilege;
+	const NaivePolicyDb::PolicySR* curr_policy = NULL;
+
+	if (ret == Decision::ANY) {
+		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::MANDATORY), curr_policy))
+			ret = checkPolicySR(*curr_policy, item, privilege);
+	}
+
+	if (ret == Decision::ANY) {
+		if (policy_db.getPolicy(type, PolicyType::USER, PolicyTypeValue(uid), curr_policy))
+			ret = checkPolicySR(*curr_policy, item, privilege);
+	}
+
+	if (ret == Decision::ANY) {
+		if (policy_db.getPolicy(type, PolicyType::GROUP, PolicyTypeValue(gid), curr_policy))
+			ret = checkPolicySR(*curr_policy, item, privilege);
+	}
+
+	if (ret == Decision::ANY) {
+		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::DEFAULT), curr_policy))
+			ret = checkPolicySR(*curr_policy, item, privilege);
+	}
+
+	if (ret != Decision::ANY)
+		return parseDecision(ret, uid, label, privilege);
+	else
+		return false;
 }
