@@ -37,7 +37,7 @@ namespace ldp_xml_parser
 		RECEIVE
 	};
 
-	enum class ItemType : uint8_t{
+	enum class ItemType : uint8_t {
 		GENERIC,
 		OWN,
 		SEND,
@@ -74,41 +74,62 @@ namespace ldp_xml_parser
 
 	class ItemBuilder;
 
-	class Item {
-	protected:
-		Decision _decision;
-		const char* _privilege;
-		bool _is_owner;
+	class DecisionItem {
+	private:
+		Decision __decision;
+		const char* __privilege;
 	public:
 		friend class ItemBuilder;
-		Item(Decision decision = Decision::ANY, const char* privilege = NULL, bool isOwner = false);
-		virtual ~Item();
-		virtual bool match(const Item& item) const;
-		virtual bool match(const Item* item) const;
-		virtual Decision getDecision() const;
-		virtual const char*  getPrivilege() const;
-		virtual ItemType getType() const;
-		virtual const char* toString(char* str) const;
+		DecisionItem(Decision decision = Decision::ANY, const char* privilege = NULL);
+		~DecisionItem();
+		Decision getDecision() const;
+		const char*  getPrivilege() const;
+		ItemType getType() const;
+		const char* toString(char* str) const;
 	};
 
-	class ItemOwn : public Item {
+	class ItemOwn {
 	private:
+		DecisionItem __decision;
 		const char* __name;
 		bool __is_prefix;
 	public:
 		friend class ItemBuilder;
 		ItemOwn(const char* name = NULL,
-				bool is_prefix = false,
 				Decision decision = Decision::ANY,
 				const char* privilege = NULL);
-		virtual ~ItemOwn();
-		virtual bool match(const Item* item) const;
-		virtual ItemType getType() const;
-		virtual const char* toString(char* str) const;
+		~ItemOwn();
+		bool match(const char* const name) const;
+		ItemType getType() const;
+		const char* toString(char* str) const;
+		const DecisionItem& getDecision() const;
 	};
 
-	class ItemSendReceive : public Item {
-		const char** __names;
+	struct NameSR {
+		const char* name;
+		int len;
+		NameSR(const char* m = NULL, int l = 0);
+	};
+#define KDBUS_CONN_MAX_NAMES 256
+	struct MatchItemSR {
+		int names_num;
+	    NameSR names[KDBUS_CONN_MAX_NAMES+1];
+		const char* interface;
+		const char* member;
+		const char* path;
+		MessageType type;
+		MessageDirection direction;
+		MatchItemSR(const char* i = NULL, const char* me = NULL, const char* p = NULL, MessageType t = MessageType::ANY, MessageDirection d = MessageDirection::ANY);
+		~MatchItemSR();
+		void addName(const char* name);
+		bool addNames(const char* name);
+		const char* toString(char* str) const;
+	};
+
+	class ItemSendReceive {
+	private:
+		DecisionItem __decision;
+		NameSR  __name;
 		const char* __interface;
 		const char* __member;
 		const char* __path;
@@ -116,7 +137,7 @@ namespace ldp_xml_parser
 		MessageDirection __direction;
 	public:
 		friend class ItemBuilder;
-		ItemSendReceive(const char** names = NULL,
+		ItemSendReceive(const char* name = NULL,
 						const char* interface = NULL,
 						const char* member = NULL,
 						const char* path = NULL,
@@ -124,26 +145,27 @@ namespace ldp_xml_parser
 						MessageDirection direction = MessageDirection::ANY,
 						Decision decision = Decision::ANY,
 						const char* privilege = NULL);
-		virtual ~ItemSendReceive();
-		virtual bool match(const Item* item) const;
+		~ItemSendReceive();
+		bool match(const MatchItemSR& item) const;
 		MessageDirection getDirection() const;
-		virtual ItemType getType() const;
-		virtual const char* toString(char* str) const;
+		ItemType getType() const;
+		const char* toString(char* str) const;
+		const DecisionItem& getDecision() const;
 	};
 
+	class NaivePolicyDb;
 	class ItemBuilder {
 	private:
-		Item* __current;
-		Decision __delayed_decision;
-		const char* __delayed_privilege;
+		DecisionItem __decision;
+		ItemOwn* __current_own;
+		ItemSendReceive* __current_sr;
 		ItemOwn* getOwnItem();
 		ItemSendReceive* getSendReceiveItem();
 		char* duplicate(const char* str);
-		void prepareItem();
 	public:
 		ItemBuilder();
 		~ItemBuilder();
-		Item* generateItem();
+		void generateItem(NaivePolicyDb& db, PolicyType& policy_type, PolicyTypeValue& policy_type_value);
 		void reset();
 		void addUser(const char* name);
 		void addGroup(const char* name);
@@ -159,7 +181,6 @@ namespace ldp_xml_parser
 		void setPrefix(bool value);
 	};
 
-	class NaivePolicyDb;
 	class DbAdapter {
 	private:
 		enum state {
