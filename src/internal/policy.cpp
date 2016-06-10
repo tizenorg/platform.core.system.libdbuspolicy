@@ -11,16 +11,6 @@ static const char* message_type[] = { "ANY", "METHOD_CALL", "METHOD_RETURN", "ER
 static const char* message_dir[] = { "ANY", "SEND", "RECEIVE"};
 static const char* message_decision[] = {"NO_DECISION", "ALLOW", "DENY", "CHECK"};
 
-static bool __compare_str(const char* a, const char* b) {
-
-	while(*a && *b && *a != ' ' && *b != ' ') {
-		if (*a != *b)
-			return false;
-		a++; b++;
-	}
-	return ((*a == 0 || *a == ' ') && (*b == 0 || *b != ' '));
-}
-
 static MessageType __str_to_message_type(const char* str) {
 	if (!std::strcmp(str, "method_call"))
 		return MessageType::METHOD_CALL;
@@ -180,13 +170,10 @@ void DbAdapter::xmlTraversal(bool bus,
 		}
 
 		if(!pt.empty() && level > 1) {
-			Item* it = __builder.generateItem();
-			if (it) {
-				if (bus)
-					__session_db.addItem(policy_type, policy_type_value, it);
-				else
-					__system_db.addItem(policy_type, policy_type_value, it);
-			}
+			if (bus)
+				__builder.generateItem(__session_db, policy_type, policy_type_value);
+			else
+				__builder.generateItem(__system_db, policy_type, policy_type_value);
 		}
 	}
 }
@@ -206,66 +193,58 @@ void DbAdapter::updateDb(bool bus, boost::property_tree::ptree& xmlTree, std::ve
 	}
 }
 
-Item::Item(Decision decision, const char* privilege, bool isOwner)
-	: _decision(decision), _privilege(privilege), _is_owner(isOwner) {
-
+DecisionItem::DecisionItem(Decision decision, const char* privilege)
+	: __decision(decision), __privilege(privilege)
+{
 }
 
-Item::~Item() {
-	if (_is_owner) {
-		delete[] _privilege;
-	}
+DecisionItem::~DecisionItem()
+{
+	if (__privilege)
+		delete[] __privilege;
 }
 
-bool Item::match(const Item& item) const {
-	return match(&item);
+Decision DecisionItem::getDecision() const {
+	return __decision;
 }
 
-bool Item::match(const Item* item) const {
-	return true;
+const char* DecisionItem::getPrivilege() const {
+	return __privilege;
 }
 
-Decision Item::getDecision() const {
-	return _decision;
-}
-
-const char* Item::getPrivilege() const {
-	return _privilege;
-}
-
-ItemType Item::getType() const {
+ItemType DecisionItem::getType() const {
 	return ItemType::GENERIC;
 }
 
-const char* Item::toString(char* str) const {
-	snprintf(str, MAX_LOG_LINE, "Item: dec(%s) owner(%d) priv(%s)", __decision_to_str(_decision), _is_owner, _privilege);
+const char* DecisionItem::toString(char* str) const {
+	snprintf(str, MAX_LOG_LINE, "Item: dec(%s) priv(%s)", __decision_to_str(__decision), __privilege);
 	return str;
 }
 
 ItemOwn::ItemOwn(const char* name,
-				 bool is_prefix,
 				 Decision decision,
 				 const char* privilege)
-: Item(decision, privilege), __name(name), __is_prefix(is_prefix) {
+	:   __decision(DecisionItem(decision, privilege)), __name(name) {
+
 }
 
 ItemOwn::~ItemOwn() {
-	if (_is_owner) {
+	if (__name)
 		delete[] __name;
-	}
 }
+
 ItemType ItemOwn::getType() const {
 	return ItemType::OWN;
 }
-bool ItemOwn::match(const Item* item) const {
-	const ItemOwn* it = dynamic_cast<const ItemOwn*>(item);
+
+bool ItemOwn::match(const char* const item) const {
 	if (__is_prefix) {
 		int i = 0;
 		if (!__name)
 			return false;
 
-		for (i = 0; __name[i] && it->__name[i]; i++)
-			if (__name[i] != it->__name[i])
+		for (i = 0; __name[i] && item[i]; i++)
+			if (__name[i] != item[i])
 				return false;
 
 		if (__name[i] != 0)
@@ -275,94 +254,119 @@ bool ItemOwn::match(const Item* item) const {
 	} else if (!__name)
 		return true;
 	else {
-		return std::strcmp(__name, it->__name) == 0;
+		return std::strcmp(__name, item) == 0;
 	}
 }
 
 const char* ItemOwn::toString(char* str) const {
-	char parent[MAX_LOG_LINE];
-	const char* t = Item::toString(parent);
-	snprintf(str, MAX_LOG_LINE, "ItemOwn: service(%s), pref(%d) <- %s", __name, __is_prefix, t);
+	snprintf(str, MAX_LOG_LINE, "ItemOwn: service(%s), pref(%d)", __name, __is_prefix);
 	return str;
 }
 
-ItemSendReceive::ItemSendReceive(const char** names,
-												  const char* interface,
-												  const char* member, const char* path,
-												  MessageType type, MessageDirection direction,
-												  Decision decision,
-												  const char* privilege)
-	: Item(decision, privilege),
-	  __names(names),
-	  __interface(interface),
-	  __member(member),
-	  __path(path),
-	  __type(type),
-	  __direction(direction) {
+
+const DecisionItem& ItemOwn::getDecision() const {
+	return __decision;
 }
-const char* ItemSendReceive::toString(char* str) const {
-	char parent[MAX_LOG_LINE];
-	char buff[MAX_LOG_LINE];
-	char* curr = buff;
-	const char* t = Item::toString(parent);
+
+NameSR::NameSR(const char* m, int l) : name(m), len(l)
+{
+}
+
+MatchItemSR::MatchItemSR(const char* i, const char* me, const char* p, MessageType t, MessageDirection d)
+	: names_num(0), interface(i), member(me), path(p), type(t), direction(d) {
+}
+
+MatchItemSR::~MatchItemSR(){
+}
+
+void MatchItemSR::addName(const char* name) {
+	names[names_num++] = NameSR(name, std::strlen(name));
+}
+
+bool MatchItemSR::addNames(const char* name) {
 	int i = 0;
-	int k = 0;
-	while(__names && __names[i]){
-		for (k = 0; __names[i][k] && __names[i][k] != ' ';k++){
-			*curr = __names[i][k];
-			curr +=1;
-		}
-		*curr = ' ';
-		curr += 1;
-		i++;
+	int j = 0;
+
+	if (name) {
+		assert((name[i] > 'a'&& name[i] < 'z') || (name[i] > 'A'&& name[i] < 'Z') || (name[i] > '0'&& name[i] < '9'));
+		while (name[i] && names_num < KDBUS_CONN_MAX_NAMES + 1) {
+			char c;
+			int len;
+			j = i;
+			while ((c = name[i++]) && ' ' != c);
+			if (!c) {
+				--i;
+				len = i-j;
+			} else
+				len = i-j-1;
+			names[names_num++] = NameSR(name + j, len);
+	    }
+		if (names_num >= KDBUS_CONN_MAX_NAMES + 1)
+			return false;
 	}
-	*curr = 0;
-	curr += 1;
-	snprintf(str, MAX_LOG_LINE, "ItemSR: name(%s), inter(%s), member(%s), path(%s), type(%s), dir(%s) <- %s", buff, __interface, __member, __path, __message_type_to_str(__type), __message_dir_to_str(__direction), t);
+	return true;
+}
+
+ItemSendReceive::ItemSendReceive(const char* name,
+								 const char* interface,
+								 const char* member,
+								 const char* path,
+								 MessageType type,
+								 MessageDirection direction,
+								 Decision decision,
+								 const char* privilege)
+	: 	__name(NameSR(name, name?std::strlen(name):0)),
+		__interface(interface),
+		__member(member),
+		__path(path),
+		__type(type),
+		__direction(direction) {
+
+}
+
+const char* ItemSendReceive::toString(char* str) const {
+	snprintf(str, MAX_LOG_LINE, "ItemSR: name(%s), inter(%s), member(%s), path(%s), type(%s), dir(%s)", __name.name, __interface, __member, __path, __message_type_to_str(__type), __message_dir_to_str(__direction));
 	return str;
 }
-ItemSendReceive::~ItemSendReceive() {
-	if (_is_owner) {
-		delete[] __interface;
-		delete[] __member;
-		delete[] __path;
 
-		if (__names) {
-			int i = 0;
-			while (__names[i])
-				delete[] __names[i++];
-			delete[] __names;
-		}
+ItemSendReceive::~ItemSendReceive() {
+	delete[] __interface;
+	delete[] __member;
+	delete[] __path;
+
+	if (__name.len > 0) {
+		delete[] __name.name;
 	}
 }
 
-bool ItemSendReceive::match(const Item* item) const {
-	const ItemSendReceive* it = dynamic_cast<const ItemSendReceive*>(item);
+bool ItemSendReceive::match(const MatchItemSR& item) const {
 
-	if (__type != MessageType::ANY && __type != it->__type)
+	if (__type != MessageType::ANY && __type != item.type)
 		return false;
 
-	if (__direction != it->__direction)
+	if (__direction != item.direction)
 		return false;
 
-	if (__interface && it->__interface && std::strcmp(__interface, it->__interface))
+	if (__interface && item.interface && std::strcmp(__interface, item.interface))
 		return false;
 
-	if (__path && it->__path && std::strcmp(__path, it->__path))
+	if (__path && item.path && std::strcmp(__path, item.path))
 		return false;
 
-	if (__member && it->__member && std::strcmp(__member, it->__member))
+	if (__member && item.member && std::strcmp(__member, item.member))
 		return false;
 
-	if (__names && __names[0]) {
+	if (__name.len > 0 ) {
 		int  i = 0;
 		bool f = false;
-		if (it->__names) {
-			while (it->__names[i]) {
-				if (__compare_str(it->__names[i++], __names[0])) {
+		if (item.names_num > 0) {
+			while (i < item.names_num) {
+				if (item.names[i].len == __name.len &&
+					!memcmp(item.names[i].name, __name.name, item.names[i].len)) {
 					f = true;
 					break;
 				}
+				i++;
 			}
 			if (!f)
 				return false;
@@ -384,40 +388,46 @@ MessageDirection ItemSendReceive::getDirection() const {
 	return __direction;
 }
 
+const DecisionItem& ItemSendReceive::getDecision() const {
+	return __decision;
+}
+
+void ItemBuilder::prepareItem()
+{
+}
+
 ItemOwn* ItemBuilder::getOwnItem() {
-	if (!__current) {
-		__current = new ItemOwn();
+	if (!__current_own) {
+		__current_own = new ItemOwn();
 		prepareItem();
 	}
-	return dynamic_cast<ItemOwn*>(__current);
+	return __current_own;
 }
 
 ItemSendReceive* ItemBuilder::getSendReceiveItem() {
-	if (!__current) {
-		__current = new ItemSendReceive();
+	if (!__current_sr) {
+		__current_sr = new ItemSendReceive();
 		prepareItem();
 	}
-	return dynamic_cast<ItemSendReceive*>(__current);
+	return __current_sr;
 }
 
-ItemBuilder::ItemBuilder() : __current(NULL), __delayed_privilege(NULL) {
+ItemBuilder::ItemBuilder() : __current_own(NULL), __current_sr(NULL) {
 }
 
 ItemBuilder::~ItemBuilder(){
-	if (__delayed_privilege)
-		delete[] __delayed_privilege;
-	if (__current)
-		delete __current;
+	if (__current_sr)
+		delete __current_sr;
+
+	if (__current_own)
+		delete __current_own;
 }
 
 void ItemBuilder::reset() {
-	if (__delayed_privilege)
-		delete[] __delayed_privilege;
-	if (__current)
-		delete __current;
-
-	__current = NULL;
-	__delayed_privilege = NULL;
+	__decision.__decision = Decision::ANY;
+	__decision.__privilege = NULL;
+	__current_sr = NULL;
+	__current_own = NULL;
 }
 
 char* ItemBuilder::duplicate(const char* str) {
@@ -436,21 +446,15 @@ char* ItemBuilder::duplicate(const char* str) {
 	return ret;
 }
 
-void ItemBuilder::prepareItem() {
-		__current->_is_owner = true;
-		if (__delayed_privilege)
-			__current->_privilege = __delayed_privilege;
-
-		__current->_decision = __delayed_decision;
-		__delayed_privilege = NULL;
-}
-
-Item* ItemBuilder::generateItem() {
-	Item* ret = __current;
-	__current = NULL;
-	__delayed_decision = Decision::ANY;
-	__delayed_privilege = NULL;
-	return ret;
+void ItemBuilder::generateItem(NaivePolicyDb& db, PolicyType& policy_type, PolicyTypeValue& policy_type_value) {
+	if (__current_own) {
+		__current_own->__decision = __decision;
+		db.addItem(policy_type, policy_type_value, __current_own);
+	} else if (__current_sr) {
+		__current_sr->__decision = __decision;
+		db.addItem(policy_type, policy_type_value, __current_sr);
+	}
+	reset();
 }
 
 void ItemBuilder::addOwner(const char* owner) {
@@ -462,17 +466,28 @@ void ItemBuilder::addOwner(const char* owner) {
 
 void ItemBuilder::addName(const char* name) {
 	ItemSendReceive* sr = getSendReceiveItem();
-	if (sr->__names) {
-		delete sr->__names[0];
-		delete[] sr->__names;
+	if (sr->__name.len > 0) {
+		delete[] sr->__name.name;
+		sr->__name.len = 0;
 	}
+
 	if (!name)
-		sr->__names = NULL;
+		sr->__name.name = NULL;
 	else {
-		sr->__names = new const char*[2];
-		sr->__names[0] = duplicate(name);
-		sr->__names[1] = NULL;
+		sr->__name.name = duplicate(name);
+		sr->__name.len  = std::strlen(name);
 	}
+}
+
+const char* MatchItemSR::toString(char* str) const {
+	char tmp[MAX_LOG_LINE];
+	tmp[0]  = 0;
+	for (int i = 0; i < names_num; i++) {
+		std::strcat(tmp, names[i].name);
+		std::strcat(tmp, " ");
+	}
+	snprintf(str, MAX_LOG_LINE, "matcher: services(%s), interface(%s), member(%s), path(%s), type(%s), direction(%s)", tmp, interface, member, path, __message_type_to_str(type), __message_dir_to_str(direction) );
+	return str;
 }
 
 void ItemBuilder::addInterface(const char* interface) {
@@ -501,17 +516,11 @@ void ItemBuilder::addDirection(MessageDirection direction) {
 }
 
 void ItemBuilder::addPrivilege(const char* privilege) {
-	if (!__current)
-		__delayed_privilege = duplicate(privilege);
-	else
-		__current->_privilege = duplicate(privilege);
+	__decision.__privilege = duplicate(privilege);
 }
 
 void ItemBuilder::addDecision(Decision decision) {
-	if (!__current)
-		__delayed_decision = decision;
-	else
-		__current->_decision = decision;
+	__decision.__decision = decision;
 }
 
 void ItemBuilder::setPrefix(bool value) {
