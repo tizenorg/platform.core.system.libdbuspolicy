@@ -60,7 +60,7 @@ bool NaivePolicyChecker::parseDecision(Decision decision,
 	case Decision::DENY:
 		return false;
 	case Decision::CHECK:
-		std::sprintf(uid_str, "%lu", (unsigned long)uid);
+		std::snprintf(uid_str, sizeof(uid_str) - 1, "%lu", (unsigned long)uid);
 		return ldp_cynara::Cynara::check(label, privilege, uid_str) == ldp_cynara::CynaraResult::ALLOW;
 	}
 

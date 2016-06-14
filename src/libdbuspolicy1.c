@@ -107,7 +107,7 @@ static uint64_t kdbus_unique_id(char const *name)
 	unsigned i = 2;
 	int c;
 	while (!(c = name[++i] - '0'));
-	res = c;
+	res = (uint64_t)c;
 	while ((c = (int)(name[++i]) - '0') > 0)
 		res = res*10 + c;
 	return res;

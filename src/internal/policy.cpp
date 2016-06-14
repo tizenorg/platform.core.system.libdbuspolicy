@@ -59,7 +59,7 @@ uid_t DbAdapter::convertToUid(const char* user) {
 	struct passwd pwent;
 	struct passwd *pwd;
 	char buf[1024];
-	if (getpwnam_r(user, &pwent, buf, sizeof(buf), &pwd) && pwd)
+	if (getpwnam_r(user, &pwent, buf, sizeof(buf), &pwd) || !pwd)
 		return (uid_t)-1;
 
 	return pwd->pw_uid;
@@ -73,7 +73,7 @@ gid_t DbAdapter::convertToGid(const char* group) {
 	struct group grent;
 	struct group *gg;
 	char buf[1024];
-	if (getgrnam_r(group, &grent, buf, sizeof(buf), &gg) && gg)
+	if (getgrnam_r(group, &grent, buf, sizeof(buf), &gg) || !gg)
 		return (gid_t)-1;
 
 	return gg->gr_gid;
@@ -259,6 +259,9 @@ ItemType ItemOwn::getType() const {
 }
 bool ItemOwn::match(const Item* item) const {
 	const ItemOwn* it = dynamic_cast<const ItemOwn*>(item);
+	if (!it)
+		return false;
+
 	if (__is_prefix) {
 		int i = 0;
 		if (!__name)
@@ -338,6 +341,9 @@ ItemSendReceive::~ItemSendReceive() {
 
 bool ItemSendReceive::match(const Item* item) const {
 	const ItemSendReceive* it = dynamic_cast<const ItemSendReceive*>(item);
+
+	if (!it)
+		return false;
 
 	if (__type != MessageType::ANY && __type != it->__type)
 		return false;
