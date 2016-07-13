@@ -21,7 +21,7 @@
 #include <syslog.h>
 
 #include <dbuspolicy1/libdbuspolicy1.h>
-#include "kdbus.h"
+#include <linux/kdbus.h>
 
 
 #define DBUSPOLICY1_EXPORT __attribute__ ((visibility("default")))
