@@ -29,46 +29,45 @@
 
 namespace ldp_xml_parser
 {
-    class XmlParser : boost::noncopyable
-    {
-        public:
-            ErrCode parsePolicy(bool bus,
-                    std::string const &fname) {
-                ErrCode err = parse(bus, fname);
-                return err;
-            }
+	class XmlParser : boost::noncopyable
+	{
+		public:
+			ErrCode parsePolicy(bool bus, std::string const &fname) {
+				ErrCode err = parse(bus, fname);
+				return err;
+			}
 
-            void registerAdapter(DbAdapter& adapter) {
+			void registerAdapter(DbAdapter& adapter) {
 			    __adapter = &adapter;
-            }
+			}
 
-        private:
+		private:
             //IO operation
-            static std::set<std::string> __parsed;
+			static std::set<std::string> __parsed;
 
-            DbAdapter* __adapter;
-            //Data obtained from XML
+			DbAdapter* __adapter;
+			//Data obtained from XML
 
-            ErrCode parse(bool bus, std::string const &filename) {
-                ErrCode err;
-                std::vector<std::string> incl_files;
+			ErrCode parse(bool bus, std::string const &filename) {
+				ErrCode err;
+				std::vector<std::string> incl_files;
+				err = parse(bus, true, filename, incl_files);
+				if (err.is_ok()){
+					for(const auto& x : incl_files) {
+						err = parse(bus, false, x, incl_files);
+						if (err.is_error()) break;
+					}
+				}
+				return err;
+			}
 
-                err = parse(bus, true, filename, incl_files);
-                if (err.is_ok())
-                    for(const auto& x : incl_files) {
-                        err = parse(bus, false, x, incl_files);
-                        if (err.is_error()) break;
-                    }
-                return err;
-            }
-
-            ErrCode parse(bool bus, bool first, const std::string& filename, std::vector<std::string>& included_files) {
+			ErrCode parse(bool bus, bool first, const std::string& filename, std::vector<std::string>& included_files) {
                 std::pair<ErrCode, std::string> errparam;
 				std::vector<std::string> incl_dirs;
 				if (tslog::verbose())
 					std::cout << "=== XML PARSING BEGIN === : " << filename << '\n';
 
-                errparam = parseXml(bus, filename, incl_dirs);
+				errparam = parseXml(bus, filename, incl_dirs);
 				for (int i = 0; i < incl_dirs.size(); i++) {
 					getIncludedFiles(filename, incl_dirs[i], included_files);
 				}
@@ -78,11 +77,11 @@ namespace ldp_xml_parser
 						std::cout << "=== XML PARSING END ===\n\n";
 					std::cout << "Processing of " << filename << " -> [" << errparam.first.get() << ", " << errparam.first.get_str() << "]\n";
 				}
-                return errparam.first;
-            }
+				return errparam.first;
+			}
 
-            //Get all the .conf files within included subdirectory, POSIX style as boost::filesystem is not header-only
-            void getIncludedFiles(const std::string& filename, const std::string& incldir, std::vector<std::string>& files) {
+			//Get all the .conf files within included subdirectory, POSIX style as boost::filesystem is not header-only
+			void getIncludedFiles(const std::string& filename, const std::string& incldir, std::vector<std::string>& files) {
 				DIR *dir;
 				struct dirent *ent;
 				std::string fname;
@@ -109,17 +108,17 @@ namespace ldp_xml_parser
 					}
 				} else if (tslog::enabled())
 					std::cout << "could not open directory " << dname << '\n';
-            }
+			}
 
 		std::pair<ErrCode, std::string> parseXml(bool bus, const std::string& filename, std::vector<std::string>& incl_dirs) {
-                std::pair<ErrCode, std::string> ret;
+				std::pair<ErrCode, std::string> ret;
 
 				if (__parsed.insert(filename).second)
 					try {
 						boost::property_tree::ptree pt;
 						read_xml(filename, pt);
 						if (!pt.empty()) {
-                            __adapter->updateDb(bus, pt, incl_dirs);
+							__adapter->updateDb(bus, pt, incl_dirs);
 						}
 					} catch(const boost::property_tree::xml_parser::xml_parser_error& ex) {
 						ret.first = ErrCode::error(ex.what());
@@ -129,9 +128,9 @@ namespace ldp_xml_parser
 						ret.first = ErrCode::error(filename + std::string(": unknown error while parsing XML"));
 					}
 
-                return ret;
-            }
-    };
+				return ret;
+		}
+	};
 } //namespace
 
 #endif
