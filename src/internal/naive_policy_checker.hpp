@@ -28,20 +28,33 @@ namespace ldp_xml_parser
 		NaivePolicyDb m_bus_db[2];
 		DbAdapter* m_adapter;
 		NaivePolicyDb& getPolicyDb(bool type);
-		template <typename T, class C>
-		Decision checkPolicy(const NaivePolicyDb::Policy<C>& policy,
-							 const T& item,
+
+		Decision checkPolicySR(const NaivePolicyDb::PolicySR& policy,
+							 const MatchItemSR& item,
 							 const char*& privilege);
+
+		Decision checkPolicyOwn(const NaivePolicyDb::PolicyOwn& policy,
+							 const ItemOwn& item,
+							 const char*& privilege);
+
+
 		bool parseDecision(Decision decision,
 						   uid_t uid,
 						   const char* label,
 						   const char* privilege);
-		template <typename T, class C>
-		bool checkItem(bool bus_type,
+
+		bool checkItemSR(bool bus_type,
 					   uid_t uid,
 					   gid_t gid,
 					   const char* label,
-					   const T& item,
+					   const MatchItemSR& item,
+					   const ItemType type);
+
+		bool checkItemOwn(bool bus_type,
+					   uid_t uid,
+					   gid_t gid,
+					   const char* label,
+					   const ItemOwn& item,
 					   const ItemType type);
 	public:
 		~NaivePolicyChecker();
@@ -59,6 +72,7 @@ namespace ldp_xml_parser
 				   ItemType type);
 	};
 
+
 static	void __log_item(const char* item)
 {
 	std::cout << "checkpolicy for ownership=" << item <<std::endl;
@@ -71,70 +85,5 @@ static	void __log_item(const MatchItemSR& item)
 	std::cout << "checkpolicy for: " << i_str <<std::endl;
 }
 
-template <typename T, class C>
-Decision NaivePolicyChecker::checkPolicy(const NaivePolicyDb::Policy<C>& policy,
-										 const T& item,
-										 const char*& privilege)
-{
-	if (tslog::verbose()) {
-		__log_item(item);
-	}
-
-	for (auto i : policy) {
-		if (tslog::verbose()) {
-			char tmp[MAX_LOG_LINE];
-			const char* i_str = i->getDecision().toString(tmp);
-			std::cout << "-readed: " << i_str;
-			i_str = i->toString(tmp);
-			std::cout << " " << i_str <<std::endl;
-		}
-		if (i->match(item)) {
-			if (tslog::verbose()) {
-				char tmp[MAX_LOG_LINE];
-				const char* i_str = i->getDecision().toString(tmp);
-				std::cout << "-matched: " << i_str;
-				const char* i_str2 = i->toString(tmp);
-				std::cout << " " << i_str2 <<std::endl;
-			}
-			privilege = i->getDecision().getPrivilege();
-			return i->getDecision().getDecision();
-		}
-	}
-
-	return Decision::ANY;
-}
-
-template <typename T, class C>
-bool NaivePolicyChecker::checkItem(bool bus_type, uid_t uid, gid_t gid, const char* label, const T& item, const ItemType type) {
-	NaivePolicyDb& policy_db = getPolicyDb(bus_type);
-	Decision ret = Decision::ANY;
-	const char* privilege;
-	const NaivePolicyDb::Policy<C>* curr_policy = NULL;
-
-	if (ret == Decision::ANY) {
-		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::MANDATORY), curr_policy))
-			ret = checkPolicy<T, C>(*curr_policy, item, privilege);
-	}
-
-	if (ret == Decision::ANY) {
-		if (policy_db.getPolicy(type, PolicyType::USER, PolicyTypeValue(uid), curr_policy))
-			ret = checkPolicy<T, C>(*curr_policy, item, privilege);
-	}
-
-	if (ret == Decision::ANY) {
-		if (policy_db.getPolicy(type, PolicyType::GROUP, PolicyTypeValue(gid), curr_policy))
-			ret = checkPolicy<T, C>(*curr_policy, item, privilege);
-	}
-
-	if (ret == Decision::ANY) {
-		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::DEFAULT), curr_policy))
-			ret = checkPolicy<T, C>(*curr_policy, item, privilege);
-	}
-
-	if (ret != Decision::ANY)
-		return parseDecision(ret, uid, label, privilege);
-	else
-		return false;
-}
 }
 #endif

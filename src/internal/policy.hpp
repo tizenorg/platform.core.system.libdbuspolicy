@@ -21,9 +21,20 @@
 #include <internal/internal.h>
 #include <string>
 #define MAX_LOG_LINE 1024
+#define MAX_CHILDREN 65
 
 namespace ldp_xml_parser
 {
+
+	const char char_map[128] {65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+				65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+				65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 10, 12, 65, 0,
+				1, 2, 3, 4, 5, 6, 7, 8, 9, 65, 65, 65, 65, 65, 65, 65,
+				39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+				55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 65, 65, 65, 11, 65,
+				13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+				29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 65, 65, 65, 65, 65, 65};
+
 	enum class MessageType : uint8_t {
 		ANY = 0,
 		METHOD_CALL,
@@ -99,11 +110,19 @@ namespace ldp_xml_parser
 		ItemOwn(const char* name = NULL,
 				Decision decision = Decision::ANY,
 				const char* privilege = NULL);
-		~ItemOwn();
 		bool match(const char* const name) const;
 		ItemType getType() const;
 		const char* toString(char* str) const;
 		const DecisionItem& getDecision() const;
+		const char* getName() const;
+		bool isPrefix() const;
+	};
+
+	struct TreeNode{
+		DecisionItem __decisionItem;
+		char __nameChar;
+		bool __is_prefix;
+		struct TreeNode *children[MAX_CHILDREN];
 	};
 
 	struct NameSR {
@@ -158,7 +177,8 @@ namespace ldp_xml_parser
 	class ItemBuilder {
 	private:
 		DecisionItem __decision;
-		ItemOwn* __current_own;
+		ItemOwn __current_own;
+		ItemType __current_item_type;
 		ItemSendReceive* __current_sr;
 		ItemOwn* getOwnItem();
 		ItemSendReceive* getSendReceiveItem();
