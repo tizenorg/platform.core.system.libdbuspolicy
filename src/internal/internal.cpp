@@ -27,15 +27,15 @@
 static ldp_xml_parser::NaivePolicyChecker policy_checker;
 
 static const char* get_str(const char* const szstr) {
-    return (szstr != NULL) ? szstr : "";
+	return (szstr != NULL) ? szstr : "";
 }
 
 int __internal_init(bool bus_type, const char* const config_name)
 {
-    ldp_xml_parser::XmlParser p;
+	ldp_xml_parser::XmlParser p;
 	p.registerAdapter(policy_checker.generateAdapter());
-    auto err = p.parsePolicy(bus_type, get_str(config_name));
-    return err.get();
+	auto err = p.parsePolicy(bus_type, get_str(config_name));
+	return err.get();
 }
 
 pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
