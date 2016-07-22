@@ -85,8 +85,7 @@ namespace ldp_xml_parser
             void getIncludedFiles(const std::string& filename, const std::string& incldir, std::vector<std::string>& files) {
 				DIR *dir;
 				struct dirent *ent;
-				std::string fname;
-				std::copy(filename.begin(), filename.end(), fname.begin());
+				std::string fname(filename);
 				std::string dname = dirname(const_cast<char*>(fname.c_str()));
 				if (incldir[0] != '/')
 					dname += (std::string("/") + incldir);
