@@ -23,6 +23,11 @@ struct MethodTest {
 	MessageDirection recv_send;
 };
 
+/**
+ * This test set tests ability to parse xml db
+ * and check method call allowance in many use cases
+ */
+
 struct MethodTest method_tests[]={
 	(struct MethodTest){true,    0,    0, "test", "org.test.test2",  NULL, "org.test.Itest1", "DoIt", MessageType::METHOD_CALL, MessageDirection::SEND},
 	(struct MethodTest){true,    0,    0, "test", "org.test.test3",  NULL, "org.test.Itest1", "DoIt", MessageType::METHOD_CALL, MessageDirection::RECEIVE},
