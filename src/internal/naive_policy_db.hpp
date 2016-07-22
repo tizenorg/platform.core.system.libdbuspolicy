@@ -26,29 +26,30 @@ namespace ldp_xml_parser
 {
 	class NaivePolicyDb {
 	public:
-		template <class T>
-		class Policy {
+
+
+		class PolicySR {
 		private:
-			std::vector<T*> m_items;
+			std::vector<ItemSendReceive*> m_items;
 		public:
 			class PolicyConstIterator {
 			private:
-				const std::vector<T*>& m_items;
+				const std::vector<ItemSendReceive*>& m_items;
 				int m_index;
 			public:
-				PolicyConstIterator(const std::vector<T*>& items, int position);
-				T* const& operator*() const;
+				PolicyConstIterator(const std::vector<ItemSendReceive*>& items, int position);
+				ItemSendReceive* const& operator*() const;
 				PolicyConstIterator& operator++();
 				bool operator!=(const PolicyConstIterator& it) const;
 			};
 
 			class PolicyIterator {
 			private:
-				std::vector<T*>& m_items;
+				std::vector<ItemSendReceive*>& m_items;
 				int m_index;
 			public:
-				PolicyIterator(std::vector<T*>& items, int position);
-				T*& operator*();
+				PolicyIterator(std::vector<ItemSendReceive*>& items, int position);
+				ItemSendReceive*& operator*();
 				PolicyIterator& operator++();
 				bool operator!=(const PolicyIterator& it) const;
 			};
@@ -57,7 +58,20 @@ namespace ldp_xml_parser
 			PolicyIterator end();
 			PolicyConstIterator begin() const;
 			PolicyConstIterator end() const;
-			void addItem(T* item);
+			void addItem(ItemSendReceive* item);
+		};
+
+
+		class PolicyOwn {
+			private:
+				struct TreeNode *treeRootPtr = NULL;
+				void nodeRemove(TreeNode **node);
+			public:
+				PolicyOwn();
+				~PolicyOwn();
+				void addItem(ItemOwn* item);
+				const TreeNode* getTreeRoot() const;
+
 		};
 
 		~NaivePolicyDb();
@@ -65,12 +79,12 @@ namespace ldp_xml_parser
 		bool getPolicy(const ItemType item_type,
 					   const PolicyType policy_type,
 					   const PolicyTypeValue policy_type_value,
-					   const Policy<ItemOwn>*& policy) const;
+					   const PolicyOwn*& policy) const;
 
 		bool getPolicy(const ItemType item_type,
 					   const PolicyType policy_type,
 					   const PolicyTypeValue policy_type_value,
-					   const Policy<ItemSendReceive>*& policy) const;
+					   const PolicySR*& policy) const;
 
 		void addItem(const PolicyType policy_type,
 					 const PolicyTypeValue policy_type_value,
@@ -79,155 +93,47 @@ namespace ldp_xml_parser
 		void addItem(const PolicyType policy_type,
 					 const PolicyTypeValue policy_type_value,
 					 ItemSendReceive* const item);
+
 	private:
-		template <class T>
-		struct PolicyTypeSet {
-			Policy<T> context[static_cast<std::size_t>(ContextType::MAX)];
-			std::map<uid_t, Policy<T> > user;
-			std::map<gid_t, Policy<T> > group;
+
+		struct PolicyTypeSetOwn {
+			PolicyOwn context[static_cast<std::size_t>(ContextType::MAX)];
+			std::map<uid_t, PolicyOwn > user;
+			std::map<gid_t, PolicyOwn > group;
 		};
 
-		PolicyTypeSet<ItemOwn> m_own_set;
-		PolicyTypeSet<ItemSendReceive> m_send_set;
-		PolicyTypeSet<ItemSendReceive> m_receive_set;
-		template <class T>
-		void addItem(PolicyTypeSet<T>& set,
+		struct PolicyTypeSetSR {
+			PolicySR context[static_cast<std::size_t>(ContextType::MAX)];
+			std::map<uid_t, PolicySR > user;
+			std::map<gid_t, PolicySR > group;
+		};
+
+		PolicyTypeSetOwn m_own_set;
+		PolicyTypeSetSR m_send_set;
+		PolicyTypeSetSR m_receive_set;
+
+		void addItem(PolicyTypeSetSR& set,
 					 const PolicyType policy_type,
 					 const PolicyTypeValue policy_type_value,
-					 T* const item);
-		template <class T>
-		bool getPolicy(const PolicyTypeSet<T>& set,
+					 ItemSendReceive* const item);
+
+		bool getPolicySR(const PolicyTypeSetSR& set,
 					   const PolicyType policy_type,
 					   const PolicyTypeValue policy_type_value,
-					   const Policy<T>*& policy) const;
+					   const PolicySR*& policy) const;
+
+		void addItem(PolicyTypeSetOwn& set,
+					 const PolicyType policy_type,
+					 const PolicyTypeValue policy_type_value,
+					 ItemOwn* const item);
+
+		bool getPolicyOwn(const PolicyTypeSetOwn& set,
+					   const PolicyType policy_type,
+					   const PolicyTypeValue policy_type_value,
+					   const PolicyOwn*& policy) const;
+
 	};
 
 
-template <class T>
-NaivePolicyDb::Policy<T>::PolicyConstIterator::PolicyConstIterator(const std::vector< T* > & items, int position)
-	: m_items(items), m_index(position) {
 }
-
-template <class T>
-T* const& NaivePolicyDb::Policy<T>::PolicyConstIterator::operator*() const {
-	return m_items[m_index];
-}
-
-template <class T>
-typename NaivePolicyDb::Policy<T>::PolicyConstIterator& NaivePolicyDb::Policy<T>::PolicyConstIterator::operator++() {
-	if (m_index >= 0)
-		--m_index;
-	return *this;
-}
-
-template <class T>
-bool NaivePolicyDb::Policy<T>::PolicyConstIterator::operator!=(const PolicyConstIterator& it) const {
-	return m_index != it.m_index;
-}
-
-template <class T>
-NaivePolicyDb::Policy<T>::PolicyIterator::PolicyIterator(std::vector< T* > & items, int position)
-	: m_items(items), m_index(position) {
-}
-
-template <class T>
-T*& NaivePolicyDb::Policy<T>::PolicyIterator::operator*() {
-	return m_items[m_index];
-}
-
-template <class T>
-typename NaivePolicyDb::Policy<T>::PolicyIterator& NaivePolicyDb::Policy<T>::PolicyIterator::operator++() {
-	if (m_index >= 0)
-		--m_index;
-	return *this;
-}
-
-template <class T>
-bool NaivePolicyDb::Policy<T>::PolicyIterator::operator!=(const PolicyIterator& it) const {
-	return m_index != it.m_index;
-}
-
-template <class T>
-typename NaivePolicyDb::Policy<T>::PolicyIterator NaivePolicyDb::Policy<T>::begin() {
-	int s = m_items.size() - 1;
-	return NaivePolicyDb::Policy<T>::PolicyIterator(m_items, s);
-}
-
-template <class T>
-typename NaivePolicyDb::Policy<T>::PolicyIterator NaivePolicyDb::Policy<T>::end() {
-	return NaivePolicyDb::Policy<T>::PolicyIterator(m_items, -1);
-}
-
-template <class T>
-typename NaivePolicyDb::Policy<T>::PolicyConstIterator NaivePolicyDb::Policy<T>::begin() const {
-	int s = m_items.size() - 1;
-	return NaivePolicyDb::Policy<T>::PolicyConstIterator(m_items, s);
-}
-
-template <class T>
-typename NaivePolicyDb::Policy<T>::PolicyConstIterator NaivePolicyDb::Policy<T>::end() const {
-	return NaivePolicyDb::Policy<T>::PolicyConstIterator(m_items, -1);
-}
-
-template <class T>
-void NaivePolicyDb::Policy<T>::addItem(T* item) {
-	m_items.push_back(item);
-}
-
-template <class T>
-bool NaivePolicyDb::getPolicy(const NaivePolicyDb::PolicyTypeSet<T>& set,
-							  const PolicyType policy_type,
-							  const PolicyTypeValue policy_type_value,
-							  const NaivePolicyDb::Policy<T>*& policy) const
-{
-	if (tslog::enabled())
-		std::cout<<"---policy_type =";
-	try {
-		switch (policy_type) {
-		case PolicyType::CONTEXT:
-			if (tslog::enabled())
-				std::cout << "CONTEXT =" << (int)policy_type_value.context << std::endl;
-			policy = &set.context[static_cast<std::size_t>(policy_type_value.context) ];
-			return true;
-		case PolicyType::USER:
-			if (tslog::enabled())
-				std::cout << "USER =" << (int)policy_type_value.user << std::endl;
-			policy = &set.user.at(policy_type_value.user);
-			return true;
-		case PolicyType::GROUP:
-			if (tslog::enabled())
-				std::cout << "GROUP = " << (int)policy_type_value.group << std::endl;
-			policy = &set.group.at(policy_type_value.group);
-			return true;
-		}
-	} catch (std::out_of_range&)
-	{
-		if (tslog::verbose())
-			std::cout << "GetPolicy: Out of Range exception\n";
-	}
-	if (tslog::enabled())
-		std::cout << "NO POLICY\n";
-	return false;
-}
-
-template <class T>
-void NaivePolicyDb::addItem(NaivePolicyDb::PolicyTypeSet<T>& set,
-							const PolicyType policy_type,
-							const PolicyTypeValue policy_type_value,
-							T* const item) {
-	switch (policy_type) {
-	case PolicyType::CONTEXT:
-		set.context[static_cast<std::size_t>(policy_type_value.context)].addItem(item);
-		break;
-	case PolicyType::USER:
-		set.user[policy_type_value.user].addItem(item);
-		break;
-	case PolicyType::GROUP:
-		set.group[policy_type_value.group].addItem(item);
-		break;
-	}
-}
-
-}
-
 #endif
