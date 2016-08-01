@@ -79,39 +79,39 @@ void DbAdapter::updateDecision(const boost::property_tree::ptree::value_type& v,
 							   state& t,
 							   bool& attr) {
 	const char* value = NULL;
-	if(v.first == "allow" && t == POLICY) {
+	if (v.first == "allow" && t == POLICY) {
 		__builder.reset();
 		__builder.addDecision(Decision::ALLOW);
 		t = ALLOW_DENY_CHECK;
 		attr = false;
-	} else if(v.first == "deny" && t == POLICY) {
+	} else if (v.first == "deny" && t == POLICY) {
 		__builder.reset();
 		__builder.addDecision(Decision::DENY);
 		t = ALLOW_DENY_CHECK;
 		attr = false;
-	} else if(v.first == "check" && t == POLICY) {
+	} else if (v.first == "check" && t == POLICY) {
 		__builder.reset();
 		__builder.addDecision(Decision::CHECK);
 		t = ALLOW_DENY_CHECK;
 	    attr = false;
-	} else if(v.first == "<xmlattr>") {
+	} else if (v.first == "<xmlattr>") {
 		attr = true;
-	} else if(attr && t == POLICY) {
+	} else if (attr && t == POLICY) {
 		if (v.second.data() != "*")
 			value = v.second.data().c_str();
 
-		if(v.first == "context") {
-			if(std::strcmp(value,"mandatory") == 0 ) {
+		if (v.first == "context") {
+			if (std::strcmp(value, "mandatory") == 0 ) {
 				policy_type = PolicyType::CONTEXT;
 				policy_type_value.context = ContextType::MANDATORY;
-			} else if(std::strcmp(value, "default") == 0) {
+			} else if (std::strcmp(value, "default") == 0) {
 				policy_type = PolicyType::CONTEXT;
 				policy_type_value.context = ContextType::DEFAULT;
 			}
-		} else if(v.first == "user") {
+		} else if (v.first == "user") {
 			policy_type = PolicyType::USER;
 			policy_type_value.user = convertToUid(value);
-		} else if(v.first == "group") {
+		} else if (v.first == "group") {
 			policy_type = PolicyType::GROUP;
 			policy_type_value.group = convertToGid(value);
 		} else {
@@ -122,30 +122,31 @@ void DbAdapter::updateDecision(const boost::property_tree::ptree::value_type& v,
 		if (v.second.data() != "*")
 			value = v.second.data().c_str();
 
-		if(field_has(v, "send_")) {
+		if (field_has(v, "send_")) {
 			__builder.addDirection(MessageDirection::SEND);
-		} else if(field_has(v, "receive_")) {
+		} else if (field_has(v, "receive_")) {
 			__builder.addDirection(MessageDirection::RECEIVE);
-		} else if(v.first == "own") {
+		} else if (v.first == "own") {
 			__builder.addOwner(value);
 			__builder.setPrefix(false);
-		} else if(v.first == "own_prefix") {
+		} else if (v.first == "own_prefix") {
 			__builder.addOwner(value);
 			__builder.setPrefix(true);
-		} else if(v.first == "privilege")
+		} else if (v.first == "privilege") {
 			__builder.addPrivilege(value);
+		}
 
-		if(field_has(v, "_destination"))
+		if (field_has(v, "_destination"))
 			__builder.addName(value);
-		else if(field_has(v, "_sender"))
+		else if (field_has(v, "_sender"))
 			__builder.addName(value);
-		else if(field_has(v, "_path"))
+		else if (field_has(v, "_path"))
 			__builder.addPath(value);
-		else if(field_has(v, "_interface"))
+		else if (field_has(v, "_interface"))
 			__builder.addInterface(value);
-		else if(field_has(v, "_member"))
+		else if (field_has(v, "_member"))
 			__builder.addMember(value);
-		else if(field_has(v, "_type"))
+		else if (field_has(v, "_type"))
 			__builder.addMessageType(__str_to_message_type(value));
 	} else {
 		attr = false;
@@ -161,14 +162,14 @@ void DbAdapter::xmlTraversal(bool bus,
 							 bool attr,
 							 int level) {
 	static const int Q_XML_MAX_LEVEL = 10;
-	if(level < Q_XML_MAX_LEVEL) {
+	if (level < Q_XML_MAX_LEVEL) {
 		for(const auto& v : pt) {
-			if(v.first == "<xmlcomment>") { continue; }
+			if (v.first == "<xmlcomment>") { continue; }
 			state t = tag;
 			updateDecision(v, policy_type, policy_type_value, t, attr);
 			xmlTraversal(bus, v.second, t, policy_type, policy_type_value, attr, level + 1);
 		}
-		if(!pt.empty() && level > 1) {
+		if (!pt.empty() && level > 1) {
 			if (bus)
 				__builder.generateItem(__session_db, policy_type, policy_type_value);
 			else
@@ -182,7 +183,7 @@ void DbAdapter::updateDb(bool bus, boost::property_tree::ptree& xmlTree, std::ve
 	PolicyType policy_type;
 	PolicyTypeValue policy_type_value;
 	for(const auto& x : children) {
-		if(x.first == "policy") {
+		if (x.first == "policy") {
 			__tag_state = POLICY;
 			__attr = false;
 			xmlTraversal(bus, x.second, POLICY, policy_type, policy_type_value);
@@ -224,7 +225,6 @@ ItemOwn::ItemOwn(const char* name,
 				 Decision decision,
 				 const char* privilege)
 	:   __decision(DecisionItem(decision, privilege)), __name(name) {
-
 }
 
 ItemType ItemOwn::getType() const {
@@ -277,8 +277,9 @@ bool MatchItemSR::addNames(const char* name) {
 			if (!c) {
 				--i;
 				len = i-j;
-			} else
+			} else {
 				len = i-j-1;
+			}
 			names[names_num++] = NameSR(name + j, len);
 	    }
 		if (names_num >= KDBUS_CONN_MAX_NAMES + 1)
@@ -301,7 +302,6 @@ ItemSendReceive::ItemSendReceive(const char* name,
 		__path(path),
 		__type(type),
 		__direction(direction) {
-
 }
 
 const char* ItemSendReceive::toString(char* str) const {
@@ -390,7 +390,6 @@ ItemBuilder::ItemBuilder() : __current_own(NULL), __current_sr(NULL) {
 ItemBuilder::~ItemBuilder(){
 	if (__current_sr)
 		delete __current_sr;
-
 }
 
 void ItemBuilder::reset() {
@@ -441,9 +440,9 @@ void ItemBuilder::addName(const char* name) {
 		sr->__name.len = 0;
 	}
 
-	if (!name)
+	if (!name) {
 		sr->__name.name = NULL;
-	else {
+	} else {
 		sr->__name.name = duplicate(name);
 		sr->__name.len  = std::strlen(name);
 	}

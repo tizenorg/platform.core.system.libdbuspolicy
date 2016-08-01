@@ -5,11 +5,9 @@ using namespace ldp_xml_parser;
 
 
 NaivePolicyDb::~NaivePolicyDb() {
-
 }
 
 NaivePolicyDb::PolicyOwn::PolicyOwn(){
-
 	treeRootPtr = new struct TreeNode;
 	treeRootPtr->__decisionItem = {Decision::ANY, NULL};
 	treeRootPtr->__nameChar = '\0';
@@ -17,8 +15,6 @@ NaivePolicyDb::PolicyOwn::PolicyOwn(){
 	for(int i = 0; i < MAX_CHILDREN; i++){
 		treeRootPtr->children[i] = NULL;
 	}
-
-
 }
 
 NaivePolicyDb::PolicyOwn::~PolicyOwn(){
@@ -26,11 +22,11 @@ NaivePolicyDb::PolicyOwn::~PolicyOwn(){
 }
 
 void NaivePolicyDb::PolicyOwn::nodeRemove(TreeNode **node){
-	if(!*node){
+	if (!*node) {
 		return;
 	}
-	for(int i = 0 ; i<MAX_CHILDREN; i++){
-		if((*node)->children[i] != NULL){
+	for(int i = 0 ; i < MAX_CHILDREN; i++){
+		if ((*node)->children[i] != NULL) {
 			nodeRemove(&(*node)->children[i]);
 		}
 	}
@@ -44,15 +40,15 @@ void NaivePolicyDb::addItem(const PolicyType policy_type,
 	if (tslog::enabled()) {
 		char tmp[MAX_LOG_LINE];
 		const char* i_str = item->toString(tmp);
-		std::cout<<"Add item: "<< i_str <<std::endl;
+		std::cout << "Add item: " << i_str << std::endl;
 	}
 
 	const MessageDirection dir = item->getDirection();
-	if (dir == MessageDirection::SEND)
+	if (dir == MessageDirection::SEND) {
 		addItem(m_send_set, policy_type, policy_type_value, item);
-	else if (dir == MessageDirection::RECEIVE)
+	} else if (dir == MessageDirection::RECEIVE) {
 		addItem(m_receive_set, policy_type, policy_type_value, item);
-	else {
+	} else {
 		addItem(m_send_set, policy_type, policy_type_value, item);
 		addItem(m_receive_set, policy_type, policy_type_value, item);
 	}
@@ -64,7 +60,7 @@ void NaivePolicyDb::addItem(const PolicyType policy_type,
 	if (tslog::enabled()) {
 		char tmp[MAX_LOG_LINE];
 		const char* i_str = item->toString(tmp);
-		std::cout<<"Add item: "<< i_str <<std::endl;
+		std::cout << "Add item: " << i_str << std::endl;
 	}
 
 	addItem(m_own_set, policy_type, policy_type_value, item);
@@ -169,7 +165,6 @@ const struct TreeNode* NaivePolicyDb::PolicyOwn::getTreeRoot() const{
 	return treeRootPtr;
 }
 void NaivePolicyDb::PolicyOwn::addItem(ItemOwn* item) {
-
 	const char *name = item->getName();
 	/*TODO move this few layers up*/
 	if(!name){
@@ -180,37 +175,29 @@ void NaivePolicyDb::PolicyOwn::addItem(ItemOwn* item) {
 	assert(node);
 
 	const char *tmp = name;
-	while(tmp && *tmp != '\0'){
-		if(char_map[*tmp]>64){
+	while (tmp && *tmp != '\0') {
+		if (char_map[*tmp] > 64) {
 			/*Forbidden char*/
 			return;
 		}
 		tmp++;
 	}
 	int childIndex = 0;
-	while(name && *name != '\0'){
-
+	while (name && *name != '\0') {
 		childIndex = char_map[*name];
-
-		if(node->children[childIndex] == NULL){
-
+		if (node->children[childIndex] == NULL){
 			node->children[childIndex] = new struct TreeNode;
-
 			node->children[childIndex]->__decisionItem = {Decision::ANY, NULL};
 			node->children[childIndex]->__nameChar = *name;
 			node->children[childIndex]->__is_prefix = false;
-
 			for(int k = 0; k < MAX_CHILDREN; k++){
 				node->children[childIndex]->children[k] = NULL;
 			}
 
 			node = node->children[childIndex];
-		}
-
-		else {
+		} else {
 			node = node->children[childIndex];
 		}
-
 		name++;
 	}
 	node->__decisionItem = item->getDecision();
@@ -224,7 +211,7 @@ bool NaivePolicyDb::getPolicySR(const NaivePolicyDb::PolicyTypeSetSR& set,
 							  const NaivePolicyDb::PolicySR*& policy) const
 {
 	if (tslog::enabled())
-		std::cout<<"---policy_type =";
+		std::cout << "---policy_type =";
 	try {
 		switch (policy_type) {
 		case PolicyType::CONTEXT:
@@ -278,7 +265,7 @@ bool NaivePolicyDb::getPolicyOwn(const NaivePolicyDb::PolicyTypeSetOwn& set,
 							  const NaivePolicyDb::PolicyOwn*& policy) const
 {
 	if (tslog::enabled())
-		std::cout<<"---policy_type =";
+		std::cout << "---policy_type =";
 	try {
 		switch (policy_type) {
 		case PolicyType::CONTEXT:

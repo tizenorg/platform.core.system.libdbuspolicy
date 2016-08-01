@@ -39,27 +39,22 @@ Cynara& Cynara::getInstance() {
 }
 
 CynaraResult Cynara::check(const char* label, const char* privilege, const char* uid) {
-
-	const char* _label="";
-	const char* _uid="";
-	const char* _privilege="";
+	const char* _label = "";
+	const char* _uid = "";
+	const char* _privilege = "";
 	CynaraResult ret;
-
 	if (label)
-		_label=label;
-
+		_label = label;
 	if (privilege)
-		_privilege=privilege;
-
+		_privilege = privilege;
 	if (uid)
-		_uid=uid;
-
+		_uid = uid;
 	pthread_mutex_lock(&__mutex);
 	Cynara& c = Cynara::getInstance();
-	if (!c.init())
+	if (!c.init()) {
 		ret = CynaraResult::ERROR_INIT;
-	else {
-		int r = cynara_check (c.__cynara, _label, c.__session, _uid, _privilege);
+	} else {
+		int r = cynara_check(c.__cynara, _label, c.__session, _uid, _privilege);
 		if (r == CYNARA_API_ACCESS_ALLOWED)
 			ret = CynaraResult::ALLOW;
 		else if (r == CYNARA_API_ACCESS_DENIED)

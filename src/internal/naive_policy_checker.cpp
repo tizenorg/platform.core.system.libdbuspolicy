@@ -22,8 +22,6 @@ DbAdapter& NaivePolicyChecker::generateAdapter() {
 	return *m_adapter;
 }
 
-
-
 NaivePolicyDb& NaivePolicyChecker::getPolicyDb(bool type) {
 	return m_bus_db[type];
 }
@@ -32,10 +30,9 @@ bool NaivePolicyChecker::parseDecision(Decision decision,
 									   uid_t uid,
 									   const char* label,
 									   const char* privilege) {
-
 	char uid_str[17];
 	if (tslog::verbose()) {
-		std::cout<<"----Decision made\n";
+		std::cout << "----Decision made\n";
 	}
 	switch (decision)
 	{
@@ -48,7 +45,6 @@ bool NaivePolicyChecker::parseDecision(Decision decision,
 		std::snprintf(uid_str, sizeof(uid_str) - 1, "%lu", (unsigned long)uid);
 		return ldp_cynara::Cynara::check(label, privilege, uid_str) == ldp_cynara::CynaraResult::ALLOW;
 	}
-
 	return false;
 }
 
@@ -82,7 +78,6 @@ Decision NaivePolicyChecker::checkPolicySR(const NaivePolicyDb::PolicySR& policy
 	if (tslog::verbose()) {
 		__log_item(item);
 	}
-
 	for (auto i : policy) {
 		if (tslog::verbose()) {
 			char tmp[MAX_LOG_LINE];
@@ -103,12 +98,10 @@ Decision NaivePolicyChecker::checkPolicySR(const NaivePolicyDb::PolicySR& policy
 			return i->getDecision().getDecision();
 		}
 	}
-
 	return Decision::ANY;
 }
 
 Decision NaivePolicyChecker::checkPolicyOwn(const NaivePolicyDb::PolicyOwn& policy, const ItemOwn& item, const char*& privilege) {
-
 	if (tslog::verbose()) {
 		__log_item(item);
 	}
@@ -117,85 +110,59 @@ Decision NaivePolicyChecker::checkPolicyOwn(const NaivePolicyDb::PolicyOwn& poli
 	int childIndex = 0;
 	assert(node);
 	Decision ret = Decision::ANY;
-
 	while((name != NULL)&& (*name != '\0')){
-
-
 		childIndex = char_map[*name];
-		if(childIndex > 64){
+		if (childIndex > 64){
 			/*name contains forbidden char*/
 			privilege = NULL;
 			return Decision::DENY;
 		}
 		/*Current node is prefix, remeber decision*/
-		if(node->__is_prefix){
+		if (node->__is_prefix){
 			ret = node->__decisionItem.getDecision();;
 			privilege = node->__decisionItem.getPrivilege();
 		}
-
 		/*Node for this letter dont exist*/
-		if(node->children[childIndex] == NULL){
+		if (node->children[childIndex] == NULL){
 			goto out;
-		}
-		else{/*if it exists check for next letter in its child*/
+		} else {/*if it exists check for next letter in its child*/
 			node = node->children[childIndex];
 		}
-
 		name++;
-
 	}
 out:
-	if(ret == Decision::ANY){
+	if (ret == Decision::ANY){
 		privilege = node->__decisionItem.getPrivilege();
 		return node->__decisionItem.getDecision();
-	}
-	else
-
+	} else {
 		return ret;
-
+	}
 }
 
-
-
-
 bool NaivePolicyChecker::checkItemOwn(bool bus_type, uid_t uid, gid_t gid, const char* label, const ItemOwn& item, const ItemType type) {
-
 	NaivePolicyDb& policy_db = getPolicyDb(bus_type);
 	Decision ret = Decision::ANY;
 	const char* privilege;
 	const NaivePolicyDb::PolicyOwn* curr_policy = NULL;
 	if (ret == Decision::ANY) {
-
 		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::MANDATORY), curr_policy))
-
 			ret = checkPolicyOwn(*curr_policy, item, privilege);
 	}
-
 	if (ret == Decision::ANY) {
-
 		if (policy_db.getPolicy(type, PolicyType::USER, PolicyTypeValue(uid), curr_policy))
-
 			ret = checkPolicyOwn(*curr_policy, item, privilege);
 	}
-
 	if (ret == Decision::ANY) {
-
 		if (policy_db.getPolicy(type, PolicyType::GROUP, PolicyTypeValue(gid), curr_policy))
-
 			ret = checkPolicyOwn(*curr_policy, item, privilege);
 	}
-
 	if (ret == Decision::ANY) {
-
 		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::DEFAULT), curr_policy))
-
 			ret = checkPolicyOwn(*curr_policy, item, privilege);
 	}
 	if (ret != Decision::ANY){
-
 		return parseDecision(ret, uid, label, privilege);
-	}
-	else{
+	} else {
 		return false;
 	}
 }
@@ -206,27 +173,22 @@ bool NaivePolicyChecker::checkItemSR(bool bus_type, uid_t uid, gid_t gid, const 
 	Decision ret = Decision::ANY;
 	const char* privilege;
 	const NaivePolicyDb::PolicySR* curr_policy = NULL;
-
 	if (ret == Decision::ANY) {
 		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::MANDATORY), curr_policy))
 			ret = checkPolicySR(*curr_policy, item, privilege);
 	}
-
 	if (ret == Decision::ANY) {
 		if (policy_db.getPolicy(type, PolicyType::USER, PolicyTypeValue(uid), curr_policy))
 			ret = checkPolicySR(*curr_policy, item, privilege);
 	}
-
 	if (ret == Decision::ANY) {
 		if (policy_db.getPolicy(type, PolicyType::GROUP, PolicyTypeValue(gid), curr_policy))
 			ret = checkPolicySR(*curr_policy, item, privilege);
 	}
-
 	if (ret == Decision::ANY) {
 		if (policy_db.getPolicy(type, PolicyType::CONTEXT, PolicyTypeValue(ContextType::DEFAULT), curr_policy))
 			ret = checkPolicySR(*curr_policy, item, privilege);
 	}
-
 	if (ret != Decision::ANY)
 		return parseDecision(ret, uid, label, privilege);
 	else

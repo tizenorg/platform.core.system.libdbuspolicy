@@ -79,7 +79,7 @@ bool method_test() {
 	return flag;
 }
 
-int main () {
+int main() {
 	__internal_init_once();
 	if (!method_test())
 		return -1;

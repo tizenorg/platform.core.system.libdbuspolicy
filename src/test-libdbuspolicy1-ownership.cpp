@@ -67,7 +67,7 @@ bool ownership_test() {
 	return flag;
 }
 
-int main () {
+int main() {
 	__internal_init_once();
 	if (!ownership_test())
 		return -1;

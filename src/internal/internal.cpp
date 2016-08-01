@@ -75,10 +75,10 @@ int __internal_can_send(bool bus_type,
 						const char* const member,
 						int type)
 {
-	ldp_xml_parser::MatchItemSR matcher (interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
+	ldp_xml_parser::MatchItemSR matcher(interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
 	if (!matcher.addNames(destination)) {
 		if (tslog::verbose())
-			std::cout << "Destination too long: "<<destination<<std::endl;
+			std::cout << "Destination too long: " << destination << std::endl;
 		return false;
 	}
 	return policy_checker.check(bus_type, user, group, label, matcher, ldp_xml_parser::ItemType::SEND);
@@ -95,7 +95,7 @@ int __internal_can_send_multi_dest(bool bus_type,
 								   int type)
 {
 	int i = 0;
-	ldp_xml_parser::MatchItemSR matcher (interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
+	ldp_xml_parser::MatchItemSR matcher(interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::SEND);
 	if (destination)
 		while (destination[i++]) {
 			matcher.addName(destination[i]);
@@ -113,10 +113,10 @@ int __internal_can_recv(bool bus_type,
 						const char* const member,
 						int type)
 {
-	ldp_xml_parser::MatchItemSR matcher (interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::RECEIVE);
+	ldp_xml_parser::MatchItemSR matcher(interface, member, path, static_cast<ldp_xml_parser::MessageType>(type), ldp_xml_parser::MessageDirection::RECEIVE);
 	if (!matcher.addNames(sender)) {
 		if (tslog::verbose())
-			std::cout << "Sender too long: "<<sender<<std::endl;
+			std::cout << "Sender too long: " << sender << std::endl;
 		return false;
 	}
 	return policy_checker.check(bus_type, user, group, label, matcher, ldp_xml_parser::ItemType::RECEIVE);

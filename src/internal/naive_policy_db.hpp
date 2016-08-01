@@ -26,8 +26,6 @@ namespace ldp_xml_parser
 {
 	class NaivePolicyDb {
 	public:
-
-
 		class PolicySR {
 		private:
 			std::vector<ItemSendReceive*> m_items;
@@ -71,7 +69,6 @@ namespace ldp_xml_parser
 				~PolicyOwn();
 				void addItem(ItemOwn* item);
 				const TreeNode* getTreeRoot() const;
-
 		};
 
 		~NaivePolicyDb();
@@ -131,9 +128,6 @@ namespace ldp_xml_parser
 					   const PolicyType policy_type,
 					   const PolicyTypeValue policy_type_value,
 					   const PolicyOwn*& policy) const;
-
 	};
-
-
 }
 #endif

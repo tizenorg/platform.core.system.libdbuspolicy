@@ -55,7 +55,7 @@ namespace ldp_xml_parser
 
                 err = parse(bus, true, filename, incl_files);
                 if (err.is_ok())
-                    for(const auto& x : incl_files) {
+                    for (const auto& x : incl_files) {
                         err = parse(bus, false, x, incl_files);
                         if (err.is_error()) break;
                     }
@@ -107,8 +107,9 @@ namespace ldp_xml_parser
 						std::copy(files.begin(), files.end(), std::ostream_iterator<std::string>(std::cout, "\n"));
 						std::cout << '\n';
 					}
-				} else if (tslog::enabled())
+				} else if (tslog::enabled()) {
 					std::cout << "could not open directory " << dname << '\n';
+				}
             }
 
 		std::pair<ErrCode, std::string> parseXml(bool bus, const std::string& filename, std::vector<std::string>& incl_dirs) {

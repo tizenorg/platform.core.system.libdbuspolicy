@@ -69,7 +69,6 @@ namespace {
             bool is_error() const {
                 return (m_err < 0);
             }
-
     };
 } //namespace
 

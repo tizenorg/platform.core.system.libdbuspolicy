@@ -46,7 +46,7 @@ bool signal_test() {
 	return flag;
 }
 
-int main () {
+int main() {
 	__internal_init_once();
 	if (!signal_test())
 		return -1;
